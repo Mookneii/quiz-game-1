@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createStompClient } from '../api/websocket'
 
 const createAvatar = (name, from, to) => {
@@ -62,6 +62,7 @@ function LobbyPlayer() {
 	const location = useLocation()
 	const params = useParams()
 	const locationState = location.state || {}
+	const [gameStarted, setGameStarted] = useState(false)
 
 	const gamePin =
 		params.pin ||
@@ -82,42 +83,59 @@ function LobbyPlayer() {
 	const [players, setPlayers] = useState([])
 
 	useEffect(() => {
-		const fetchPlayers = async () => {
-			try {
-				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
-				if (response.ok) {
-					const data = await response.json()
-					setPlayers(data.players || [])
-				}
-			} catch (err) {
-				console.error("Error fetching initial players:", err)
-			}
+		setPlayers((previousPlayers) => {
+			const alreadyJoined = previousPlayers.some(
+				(player) => player.id === currentUser.id
+			)
+
+			return alreadyJoined
+				? previousPlayers
+				: [currentUser, ...previousPlayers]
+		})
+	}, [currentUser.id])
+
+	useEffect(() => {
+		if (!gamePin) {
+			return undefined
 		}
-		fetchPlayers()
 
 		const client = createStompClient()
+
 		client.onConnect = () => {
 			client.subscribe(`/topic/room/${gamePin}`, (message) => {
-				const event = JSON.parse(message.body)
-				if (event.type === 'PLAYER_JOINED') {
-					setPlayers(event.payload.players || [])
-				} else if (event.type === 'GAME_STARTED') {
-					navigate(`/game`, {
-						state: {
-							pin: gamePin,
-							playerId: currentUser.id,
-							nickname: currentUser.name,
-						}
-					})
+				try {
+					const event = JSON.parse(message.body)
+					const payload = event.data ?? event.payload ?? {}
+
+					if (event.type === 'GAME_STARTED') {
+						setGameStarted(true)
+					}
+
+					if (event.type === 'QUESTION_STARTED') {
+						navigate('/game', {
+							replace: true,
+							state: {
+								pin: gamePin,
+								playerId: currentUser.id,
+								nickname: currentUser.name,
+								question: payload.question || payload.questionDTO || null,
+								questionIndex: payload.questionIndex ?? null,
+								totalQuestions: payload.totalQuestions ?? null,
+							},
+						})
+					}
+				} catch (error) {
+					// Ignore malformed events and keep the lobby usable.
 				}
 			})
 		}
+
 		client.activate()
 
 		return () => {
 			client.deactivate()
 		}
-	}, [gamePin, navigate, currentUser.id, currentUser.name])
+	}, [currentUser.id, currentUser.name, gamePin, navigate])
 
 	return (
 		<div className="min-h-screen bg-white text-slate-900">
@@ -223,9 +241,10 @@ function LobbyPlayer() {
 
 							<button
 								type="button"
+								disabled={gameStarted}
 								className="mt-8 inline-flex w-44 items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(16,185,129,0.28)]"
 							>
-								Waiting for the host...
+								{gameStarted ? 'Preparing first question...' : 'Waiting for the host...'}
 							</button>
 						</aside>
 					</div>

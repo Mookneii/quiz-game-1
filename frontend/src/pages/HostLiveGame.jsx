@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import api from '../api/http'
 import { createStompClient } from '../api/websocket'
 
 const createAvatar = (name, from, to) => {
@@ -42,73 +43,121 @@ function HostLiveGame() {
 	const location = useLocation()
 	const params = useParams()
 	const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+	const [connectionStatus, setConnectionStatus] = useState('connecting')
+	const [liveQuestion, setLiveQuestion] = useState(null)
+	const [liveQuestionIndex, setLiveQuestionIndex] = useState(null)
+	const [liveTotalQuestions, setLiveTotalQuestions] = useState(null)
+	const [nextQuestionLoading, setNextQuestionLoading] = useState(false)
 
-	const gamePin = useMemo(() => {
+	const gamePin = (() => {
 		const locationState = location.state || {}
 		return params.pin || locationState.pin || locationState.roomCode || '482910'
-	}, [location.state, params.pin])
+	})()
 
 	const [players, setPlayers] = useState([])
 	const [currentQuestion, setCurrentQuestion] = useState(null)
 	const [questionIndex, setQuestionIndex] = useState(0)
 	const [totalQuestions, setTotalQuestions] = useState(0)
 	const [answeredPlayers, setAnsweredPlayers] = useState([])
+	const firstQuestionRequestedRef = useRef(false)
+	const [questionError, setQuestionError] = useState('')
 
 	const totalPlayers = players.length
 	const answeredCount = answeredPlayers.length
 	const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
 
 	useEffect(() => {
-		const fetchInitialData = async () => {
+		let cancelled = false
+		let client
+
+		const initializeRoom = async () => {
 			try {
 				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
-				if (response.ok) {
-					const data = await response.json()
-					setPlayers(data.players || [])
+				if (!response.ok) {
+					return
 				}
+
+				const data = await response.json()
+				if (cancelled) {
+					return
+				}
+
+				setPlayers(data.players || [])
+
+				if (data.quizId) {
+					const quizResponse = await fetch(
+						`http://localhost:8080/api/quizzes/${data.quizId}`
+					)
+					if (quizResponse.ok) {
+						const quizData = await quizResponse.json()
+						if (!Array.isArray(quizData.questions) || quizData.questions.length === 0) {
+							if (!cancelled) {
+								setQuestionError('This quiz has no questions yet. Add at least one question before hosting.')
+							}
+							return
+						}
+					}
+				}
+
+				client = createStompClient()
+				client.onConnect = () => {
+					setConnectionStatus('connected')
+					client.subscribe(`/topic/room/${gamePin}`, (message) => {
+						let event
+						try {
+							event = JSON.parse(message.body)
+						} catch (error) {
+							return
+						}
+						console.log('Host WebSocket event received:', event)
+						const payload = event.data ?? event.payload ?? {}
+
+						if (event.type === 'QUESTION_STARTED') {
+							setCurrentQuestion(payload.question || payload.questionDTO || null)
+							setQuestionIndex(payload.questionIndex ?? 0)
+							setTotalQuestions(payload.totalQuestions ?? 0)
+							setAnsweredPlayers([])
+						} else if (event.type === 'ANSWER_RESULT') {
+							const result = payload
+							setAnsweredPlayers((prev) => {
+								if (prev.includes(result.playerId)) return prev
+								return [...prev, result.playerId]
+							})
+						} else if (event.type === 'LEADERBOARD_UPDATE') {
+							setPlayers(payload || [])
+						} else if (event.type === 'GAME_FINISHED') {
+							navigate(`/leaderboard`, { state: { pin: gamePin } })
+						}
+					})
+
+					if (!firstQuestionRequestedRef.current) {
+						firstQuestionRequestedRef.current = true
+						api.post('/api/games/next', {
+							roomCode: gamePin,
+							questionIndex: 0,
+						}).catch((error) => {
+							setQuestionError(
+								error?.response?.data?.message ||
+								'Unable to load the first question for this quiz.'
+							)
+							firstQuestionRequestedRef.current = false
+						})
+					}
+				}
+				client.onWebSocketClose = () => {
+					setConnectionStatus('disconnected')
+				}
+				client.activate()
 			} catch (err) {
-				console.error("Error fetching room details:", err)
+				console.error('Error fetching room details:', err)
 			}
 		}
-		fetchInitialData()
 
-		const client = createStompClient()
-		client.onConnect = () => {
-			client.subscribe(`/topic/room/${gamePin}`, (message) => {
-				const event = JSON.parse(message.body)
-				console.log("Host WebSocket event received:", event)
-
-				if (event.type === 'QUESTION_STARTED') {
-					setCurrentQuestion(event.payload.questionDTO)
-					setQuestionIndex(event.payload.questionIndex)
-					setTotalQuestions(event.payload.totalQuestions)
-					setAnsweredPlayers([])
-				} else if (event.type === 'ANSWER_RESULT') {
-					const result = event.payload
-					setAnsweredPlayers((prev) => {
-						if (prev.includes(result.playerId)) return prev
-						return [...prev, result.playerId]
-					})
-				} else if (event.type === 'LEADERBOARD_UPDATE') {
-					setPlayers(event.payload || [])
-				} else if (event.type === 'GAME_FINISHED') {
-					navigate(`/leaderboard`, { state: { pin: gamePin } })
-				}
-			})
-
-			// Trigger the first question on startup after a brief delay to allow player subscriptions
-			setTimeout(() => {
-				fetch(`http://localhost:8080/api/games/next`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ roomCode: gamePin, questionIndex: 0 }),
-				}).catch(err => console.error("Error triggering first question:", err))
-			}, 1500)
-		}
-		client.activate()
+		initializeRoom()
 
 		return () => {
-			client.deactivate()
+			cancelled = true
+			client?.deactivate()
 		}
 	}, [gamePin, navigate])
 
@@ -117,45 +166,31 @@ function HostLiveGame() {
 		navigate('/')
 	}
 
-	const handleNextQuestion = async () => {
-		try {
-			const nextIdx = questionIndex + 1
-			if (nextIdx >= totalQuestions) {
-				handleEndGame()
-				return
-			}
-			const response = await fetch(`http://localhost:8080/api/games/next`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ roomCode: gamePin, questionIndex: nextIdx }),
-			})
-			if (!response.ok) {
-				throw new Error("Failed to load next question")
-			}
-		} catch (err) {
-			alert("Error loading next question: " + err.message)
-		}
+	const handleEndGame = () => {
+		navigate('/leaderboard')
 	}
 
-	const handleEndGame = async () => {
+	const handleNextQuestion = async () => {
+		if (questionIndex == null) {
+			return
+		}
+
 		try {
-			const response = await fetch(`http://localhost:8080/api/games/end`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ roomCode: gamePin }),
+			setNextQuestionLoading(true)
+			await api.post('/api/games/next', {
+				roomCode: gamePin,
+				questionIndex: questionIndex + 1,
 			})
-			if (!response.ok) {
-				throw new Error("Failed to end game")
-			}
-			navigate(`/leaderboard`, { state: { pin: gamePin } })
-		} catch (err) {
-			alert("Error ending game: " + err.message)
+		} catch (error) {
+			// Leave the current question visible when advancing fails.
+		} finally {
+			setNextQuestionLoading(false)
 		}
 	}
 
 	return (
 		<div className="min-h-screen bg-[#22c55e] text-slate-900">
-			<div className="mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 py-4 sm:px-6 lg:px-8">
+			<div className="mx-auto flex min-h-screen max-w-400 flex-col px-4 py-4 sm:px-6 lg:px-8">
 				<header className="grid grid-cols-3 items-center gap-4">
 					<button
 						type="button"
@@ -205,7 +240,7 @@ function HostLiveGame() {
 								<h2 className="text-2xl font-black text-slate-900">Players</h2>
 							</div>
 							<span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-								Live
+								{connectionStatus === 'connected' ? 'Live' : 'Connecting'}
 							</span>
 						</div>
 
@@ -231,64 +266,64 @@ function HostLiveGame() {
 								</div>
 							))}
 						</div>
-						<div className="mt-auto pt-8 text-center text-[11px] font-semibold uppercase tracking-[0.35em] text-white/40">
-							Waiting for question to start
+						<div className="mt-auto pt-8 text-center text-[11px] font-semibold uppercase tracking-[0.35em] text-slate-500">
+							{currentQuestion ? 'Question in progress' : 'Waiting for question to start'}
 						</div>
 					</aside>
 
-					<section className="flex min-h-[620px] flex-col rounded-[34px] bg-linear-to-br from-[#f3f4f6] via-[#eef0ff] to-[#cbd5ff] p-8 shadow-[0_18px_42px_rgba(0,0,0,0.14)] lg:p-10">
-						{currentQuestion ? (
-							<>
-								<div className="inline-flex w-fit items-center gap-2 rounded-full bg-violet-200/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-violet-600 shadow-sm">
-									<span className="h-2 w-2 rounded-full bg-violet-500" />
-									Question {questionIndex + 1} of {totalQuestions}
-								</div>
+					<section className="flex min-h-155 flex-col rounded-[34px] bg-linear-to-br from-[#f3f4f6] via-[#eef0ff] to-[#cbd5ff] p-8 shadow-[0_18px_42px_rgba(0,0,0,0.14)] lg:p-10">
+						<div className="inline-flex w-fit items-center gap-2 rounded-full bg-violet-200/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-violet-600 shadow-sm">
+							<span
+								className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500' : 'bg-violet-500'}`}
+							/>
+							{currentQuestion && questionIndex != null && totalQuestions != null
+								? `Question ${questionIndex + 1} of ${totalQuestions}`
+								: 'Preparing first question...'}
+						</div>
 
-								<div className="mt-12 max-w-4xl flex-1">
-									<h1 className="max-w-4xl text-[clamp(2rem,4vw,3.5rem)] font-black leading-tight text-slate-900">
-										{currentQuestion.questionText}
-									</h1>
+						<div className="mt-12 max-w-4xl">
+							<h1 className="max-w-4xl text-[clamp(2.8rem,5.6vw,5.5rem)] font-black leading-[0.98] tracking-tight text-slate-900">
+								{questionError ? questionError : currentQuestion ? currentQuestion.questionText : 'Preparing first question...'}
+							</h1>
+						</div>
 
-									<div className="mt-8 grid grid-cols-2 gap-4">
-										{currentQuestion.choices?.map((choice, idx) => (
-											<div
-												key={choice.id || idx}
-												className="bg-white border rounded-2xl p-5 font-bold text-slate-700 text-lg shadow-sm flex items-center gap-3"
-											>
-												<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 font-extrabold">
-													{String.fromCharCode(65 + idx)}
-												</span>
-												{choice.choiceText}
-											</div>
-										))}
+						{questionError ? (
+							<div className="mt-8 rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-8 text-lg font-semibold text-amber-800 shadow-sm">
+								{questionError}
+							</div>
+						) : currentQuestion ? (
+							<div className="mt-8 grid gap-4 sm:grid-cols-2">
+								{currentQuestion.choices?.map((choice, index) => (
+									<div
+										key={choice.id ?? choice.choiceText ?? index}
+										className="rounded-3xl border border-white/70 bg-white/70 px-5 py-4 text-xl font-bold text-slate-800 shadow-[0_8px_20px_rgba(0,0,0,0.08)]"
+									>
+										{choice.choiceText}
 									</div>
-								</div>
-
-								<div className="mt-auto flex items-end justify-between gap-4 pb-5 pt-10">
-									<div className="max-w-2xl flex-1">
-										<div className="mb-3 text-lg font-semibold text-slate-600">
-											{answeredCount} <span className="text-slate-400">/{totalPlayers} players answered</span>
-										</div>
-										<div className="h-3 w-full overflow-hidden rounded-full bg-slate-200 shadow-inner">
-											<div
-												className="h-full rounded-full bg-linear-to-r from-violet-500 via-fuchsia-500 to-pink-500"
-												style={{ width: `${answeredPercent}%` }}
-											/>
-										</div>
-									</div>
-									<div className="pb-1 text-lg font-black text-blue-600">
-										{answeredPercent}%
-									</div>
-								</div>
-							</>
+								))}
+							</div>
 						) : (
-							<div className="flex-1 flex flex-col items-center justify-center text-center">
-								<span className="text-6xl animate-bounce">⚡</span>
-								<h2 className="text-3xl font-black text-slate-700 mt-5">
-									Preparing first question...
-								</h2>
+							<div className="mt-8 rounded-[28px] border border-white/60 bg-white/40 px-6 py-8 text-lg font-semibold text-slate-700 shadow-sm backdrop-blur">
+								{nextQuestionLoading ? 'Requesting the first question...' : 'Waiting for the host-triggered question...'}
 							</div>
 						)}
+
+						<div className="mt-auto flex items-end justify-between gap-4 pb-5 pt-10">
+							<div className="max-w-2xl flex-1">
+								<div className="mb-3 text-lg font-semibold text-white/70">
+									{answeredCount} <span className="text-white/45">/24 players answered</span>
+								</div>
+								<div className="h-3 w-full overflow-hidden rounded-full bg-white/35 shadow-inner">
+									<div
+										className="h-full rounded-full bg-linear-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+										style={{ width: `${answeredPercent}%` }}
+									/>
+								</div>
+							</div>
+							<div className="pb-1 text-lg font-black text-blue-600">
+								{answeredPercent}%
+							</div>
+						</div>
 
 						<div className="mt-8 flex items-center justify-between gap-4">
 							<button
@@ -311,9 +346,10 @@ function HostLiveGame() {
 								<button
 									type="button"
 									onClick={handleNextQuestion}
-									className="inline-flex h-14 min-w-52 items-center justify-center rounded-2xl bg-blue-500 px-8 text-sm font-extrabold uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(37,99,235,0.35)] transition hover:bg-blue-600"
+									disabled={!currentQuestion || nextQuestionLoading}
+									className="inline-flex h-14 min-w-52 items-center justify-center rounded-2xl bg-blue-500 px-8 text-sm font-extrabold uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(37,99,235,0.35)] transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
 								>
-									Next Question &gt;
+									{nextQuestionLoading ? 'Loading...' : 'Next Question >'}
 								</button>
 							</div>
 						</div>

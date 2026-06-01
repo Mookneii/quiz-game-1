@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import api from '../api/http'
 import { createStompClient } from '../api/websocket'
 
 const createAvatar = (name, from, to) => {
@@ -62,6 +63,17 @@ function LobbyHost() {
 	const location = useLocation()
 	const params = useParams()
 	const locationState = location.state || {}
+	const [isStarting, setIsStarting] = useState(false)
+	const [startError, setStartError] = useState('')
+	const currentUser = {
+		id: locationState.hostId || 'host-user',
+		name: locationState.hostName || 'Berk',
+		avatar: createAvatar(
+			locationState.hostName || 'Berk',
+			'#2dd4bf',
+			'#14b8a6'
+		),
+	}
 
 	const gamePin =
 		params.pin ||
@@ -72,58 +84,70 @@ function LobbyHost() {
 	const [players, setPlayers] = useState([])
 
 	useEffect(() => {
-		const fetchPlayers = async () => {
+		if (!gamePin) {
+			return undefined
+		}
+
+		const loadRoom = async () => {
 			try {
-				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
-				if (response.ok) {
-					const data = await response.json()
-					setPlayers(data.players || [])
-				}
-			} catch (err) {
-				console.error("Error fetching initial players:", err)
+				const response = await api.get(`/api/rooms/${gamePin}`)
+				const roomPlayers = response.data?.players || []
+				setPlayers(roomPlayers.filter((player) => !player.host))
+			} catch (error) {
+				// Keep the lobby usable even if the initial load fails.
 			}
 		}
-		fetchPlayers()
+
+		loadRoom()
 
 		const client = createStompClient()
 		client.onConnect = () => {
 			client.subscribe(`/topic/room/${gamePin}`, (message) => {
-				const event = JSON.parse(message.body)
-				if (event.type === 'PLAYER_JOINED') {
-					setPlayers(event.payload.players || [])
-				} else if (event.type === 'GAME_STARTED') {
-					navigate(`/host-live-game/${gamePin}`, {
-						state: { pin: gamePin }
-					})
+				try {
+					const event = JSON.parse(message.body)
+					const payload = event.data ?? event.payload ?? {}
+
+					if (event.type === 'PLAYER_JOINED') {
+						setPlayers((previousPlayers) => {
+							const nextPlayers = payload.players || previousPlayers
+							return nextPlayers.filter((player) => !player.host)
+						})
+					}
+				} catch (error) {
+					// Ignore malformed room events.
 				}
 			})
 		}
+
 		client.activate()
 
 		return () => {
 			client.deactivate()
 		}
-	}, [gamePin, navigate])
+	}, [gamePin])
 
 	const handleStartGame = async () => {
-		try {
-			const response = await fetch(`http://localhost:8080/api/games/start`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ roomCode: gamePin }),
-			})
+		setStartError('')
+		setIsStarting(true)
 
-			if (!response.ok) {
-				throw new Error('Failed to start game')
-			}
+		try {
+			await api.post('/api/games/start', {
+				roomCode: gamePin,
+			})
 
 			navigate(`/host-live-game/${gamePin}`, {
-				state: { pin: gamePin }
+				state: {
+					pin: gamePin,
+					hostId: currentUser.id,
+					hostName: currentUser.name,
+				},
 			})
-		} catch (err) {
-			alert('Error starting game: ' + err.message)
+		} catch (error) {
+			setStartError(
+				error?.response?.data?.message || 'Unable to start the game'
+			)
+		} finally {
+			setIsStarting(false)
 		}
 	}
 
@@ -232,10 +256,16 @@ function LobbyHost() {
 							<button
 								type="button"
 								onClick={handleStartGame}
+								disabled={isStarting}
 								className="mt-8 inline-flex w-44 items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(16,185,129,0.28)]"
 							>
-								Start
+								{isStarting ? 'Starting...' : 'Start'}
 							</button>
+							{startError ? (
+								<p className="mt-3 max-w-xs text-center text-sm font-medium text-red-500">
+									{startError}
+								</p>
+							) : null}
 						</aside>
 					</div>
 				</main>
