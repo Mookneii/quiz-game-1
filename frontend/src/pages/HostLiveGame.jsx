@@ -57,7 +57,7 @@ function HostLiveGame() {
 	}
 
 	const handleEndGame = () => {
-		navigate('/results')
+		navigate('/leaderboard')
 	}
 
 	return (

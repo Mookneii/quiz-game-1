@@ -196,7 +196,7 @@ function LobbyHost() {
 
 							<button
 								type="button"
-								onClick={() => navigate('/game')}
+								onClick={() => navigate('/host-live-game')}
 								className="mt-8 inline-flex w-44 items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(16,185,129,0.28)]"
 							>
 								Start

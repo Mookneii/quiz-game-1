@@ -104,7 +104,7 @@ function LobbyPlayer() {
 						</span>
 					</Link>
 
-					<div className="rounded-full bg-gradient-to-r from-violet-100 to-fuchsia-100 px-5 py-2 text-sm font-semibold text-emerald-500 shadow-sm shadow-slate-200">
+					<div className="rounded-full bg-linear-to-r from-violet-100 to-fuchsia-100 px-5 py-2 text-sm font-semibold text-emerald-500 shadow-sm shadow-slate-200">
 						Game PIN: {gamePin}
 					</div>
 				</header>
@@ -157,7 +157,7 @@ function LobbyPlayer() {
 											</div>
 
 											{isCurrentUser ? (
-												<span className="ml-4 flex-shrink-0 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+												<span className="ml-4 shrink-0 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
 													You
 												</span>
 											) : null}
@@ -168,8 +168,8 @@ function LobbyPlayer() {
 						</section>
 
 						<aside className="flex flex-col items-center">
-							<div className="w-full overflow-hidden rounded-[22px] bg-gradient-to-b from-[#d98cff] via-[#bf7bff] to-[#9448ef] shadow-[0_18px_36px_rgba(138,75,255,0.18)]">
-								<div className="relative h-[292px] overflow-hidden">
+							<div className="w-full overflow-hidden rounded-[22px] bg-linear-to-b from-[#d98cff] via-[#bf7bff] to-[#9448ef] shadow-[0_18px_36px_rgba(138,75,255,0.18)]">
+								<div className="relative h-73 overflow-hidden">
 									<div className="absolute left-1/2 top-10 h-36 w-56 -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 									<div className="absolute left-1/2 top-16 grid -translate-x-1/2 grid-cols-5 gap-2.5">
 										{Array.from({ length: 10 }).map((_, index) => (
@@ -179,7 +179,7 @@ function LobbyPlayer() {
 											</div>
 										))}
 									</div>
-									<div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#8f42ee]/70 to-transparent" />
+									<div className="absolute inset-x-0 bottom-0 h-28 bg-linear-to-t from-[#8f42ee]/70 to-transparent" />
 									<div className="absolute inset-x-0 bottom-8 mx-auto h-2 w-44 rounded-full bg-white/10 blur-sm" />
 								</div>
 
