@@ -7,11 +7,13 @@ import JoinGame from "./pages/JoinGame";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import HostDashboard from "./pages/Dashboard";
+import AnswerRes from "./pages/AnswerRes";
+import LeaderboardPage from "./pages/Leaderboard";
 import LobbyPlayer from "./pages/LobbyPlayer";
 import LobbyHost from "./pages/LobbyHost";
 import GameRoom from "./pages/GameRoom";
 import HostLiveGame from "./pages/HostLiveGame";
-import Results from "./pages/Results";
+import CreateQuiz from "./pages/CreateQuiz";
 
 export default function App() {
   return (
@@ -26,13 +28,15 @@ export default function App() {
         <Route path="/lobby/:pin" element={<LobbyPlayer />} />
         <Route path="/lobby-host" element={<LobbyHost />} />
         <Route path="/lobby-host/:pin" element={<LobbyHost />} />
-        <Route path="/game" element={<GameRoom />} />
+        <Route path="/game" element={<GameRoom />} /> 
         <Route path="/host-live-game" element={<HostLiveGame />} />
         <Route path="/host-live-game/:pin" element={<HostLiveGame />} />
-        <Route path="/results" element={<Results />} />
         <Route path="/signup" element={<Register />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<HostDashboard />} />
+        <Route path="/host" element={<HostDashboard />} />
+        <Route path="/results" element={<AnswerRes />} />
+        <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/create-quiz" element={<CreateQuiz />} />
       </Routes>
     </BrowserRouter>
   );
