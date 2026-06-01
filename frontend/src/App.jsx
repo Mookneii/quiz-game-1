@@ -33,7 +33,7 @@ export default function App() {
         <Route path="/host-live-game/:pin" element={<HostLiveGame />} />
         <Route path="/signup" element={<Register />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<HostDashboard />} />
+        <Route path="/host" element={<HostDashboard />} />
         <Route path="/results" element={<AnswerRes />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/create-quiz" element={<CreateQuiz />} />
