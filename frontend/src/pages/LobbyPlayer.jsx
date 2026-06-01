@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useNavigate } from 'react-router-dom'
+import { createStompClient } from '../api/websocket'
 
 const createAvatar = (name, from, to) => {
 	const initials = name
@@ -57,6 +58,7 @@ const mockPlayers = [
 ]
 
 function LobbyPlayer() {
+	const navigate = useNavigate()
 	const location = useLocation()
 	const params = useParams()
 	const locationState = location.state || {}
@@ -77,19 +79,45 @@ function LobbyPlayer() {
 		),
 	}
 
-	const [players, setPlayers] = useState(mockPlayers)
+	const [players, setPlayers] = useState([])
 
 	useEffect(() => {
-		setPlayers((previousPlayers) => {
-			const alreadyJoined = previousPlayers.some(
-				(player) => player.id === currentUser.id
-			)
+		const fetchPlayers = async () => {
+			try {
+				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
+				if (response.ok) {
+					const data = await response.json()
+					setPlayers(data.players || [])
+				}
+			} catch (err) {
+				console.error("Error fetching initial players:", err)
+			}
+		}
+		fetchPlayers()
 
-			return alreadyJoined
-				? previousPlayers
-				: [currentUser, ...previousPlayers]
-		})
-	}, [currentUser.id])
+		const client = createStompClient()
+		client.onConnect = () => {
+			client.subscribe(`/topic/room/${gamePin}`, (message) => {
+				const event = JSON.parse(message.body)
+				if (event.type === 'PLAYER_JOINED') {
+					setPlayers(event.payload.players || [])
+				} else if (event.type === 'GAME_STARTED') {
+					navigate(`/game`, {
+						state: {
+							pin: gamePin,
+							playerId: currentUser.id,
+							nickname: currentUser.name,
+						}
+					})
+				}
+			})
+		}
+		client.activate()
+
+		return () => {
+			client.deactivate()
+		}
+	}, [gamePin, navigate, currentUser.id, currentUser.name])
 
 	return (
 		<div className="min-h-screen bg-white text-slate-900">
@@ -144,14 +172,14 @@ function LobbyPlayer() {
 										>
 											<div className="flex min-w-0 items-center gap-4">
 												<img
-													src={player.avatar}
-													alt={`${player.name} avatar`}
+													src={createAvatar(player.nickname || player.name || 'User', '#ff7a59', '#ff4d8d')}
+													alt={`${player.nickname || player.name} avatar`}
 													className="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm"
 												/>
 
 												<div className="min-w-0">
 													<p className="truncate text-base font-semibold text-slate-800">
-														{player.name}
+														{player.nickname || player.name}
 													</p>
 												</div>
 											</div>

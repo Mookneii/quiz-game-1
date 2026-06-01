@@ -110,6 +110,40 @@ export default function HostDashboard() {
     window.location.href = "/";
   };
 
+  // HOST ROOM
+  const handleHostRoom = async (quizId) => {
+    try {
+      const response = await fetch("http://localhost:8080/api/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          quizId: quizId,
+          hostId: user?.id,
+          hostName: user?.fullName || "Host",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create room");
+      }
+
+      const data = await response.json();
+      console.log("Room created:", data);
+
+      navigate(`/lobby-host/${data.roomCode}`, {
+        state: {
+          pin: data.roomCode,
+          hostId: user?.id,
+          hostName: user?.fullName,
+        },
+      });
+    } catch (err) {
+      alert("Error starting game: " + err.message);
+    }
+  };
+
   // FILTERED QUIZZES
   const filteredQuizzes =
     quizzes.filter((quiz) =>
@@ -291,11 +325,7 @@ export default function HostDashboard() {
                       </button>
 
                       <button
-                        onClick={() =>
-                          navigate(
-                            `/host/${quiz.id}`
-                          )
-                        }
+                        onClick={() => handleHostRoom(quiz.id)}
                         className="flex-1 border border-blue-500 text-blue-500 hover:bg-blue-50 py-3 rounded-xl font-semibold transition"
                       >
                         Host

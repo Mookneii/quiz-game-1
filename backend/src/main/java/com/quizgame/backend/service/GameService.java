@@ -233,6 +233,7 @@ public class GameService {
     private List<LeaderboardEntryDTO> buildLeaderboard(Long roomId) {
         List<RoomPlayer> players = roomPlayerRepository.findByRoomIdOrderByJoinedAtAsc(roomId);
         return players.stream()
+                .filter(player -> !Boolean.TRUE.equals(player.getHost()))
                 .map(player -> new LeaderboardEntryDTO(
                         player.getId(),
                         player.getNickname(),
@@ -249,6 +250,7 @@ public class GameService {
         List<GameResult> existing = gameResultRepository.findByRoomId(room.getId());
         if (!existing.isEmpty()) {
             return existing.stream()
+                    .filter(result -> !Boolean.TRUE.equals(result.getPlayer().getHost()))
                     .map(result -> new GameResultDTO(
                             result.getPlayer().getId(),
                             result.getPlayer().getNickname(),
@@ -262,6 +264,11 @@ public class GameService {
         List<GameResultDTO> results = new ArrayList<>();
 
         for (RoomPlayer player : players) {
+            // Skip the host – they are not a game participant
+            if (Boolean.TRUE.equals(player.getHost())) {
+                continue;
+            }
+
             int totalScore = safeScore(player);
             int correctCount = (int) answerRepository.countByRoomIdAndPlayerIdAndCorrectTrue(room.getId(), player.getId());
 

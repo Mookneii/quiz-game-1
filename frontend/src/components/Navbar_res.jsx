@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
-export default function Navbar_res() {
+export default function Navbar_res({ pin, score }) {
   const navigate = useNavigate();
 
   const [user, setUser] = useState(null);
@@ -48,11 +48,11 @@ export default function Navbar_res() {
         {/* RIGHT SIDE */}
 					<div className="flex items-center gap-3">
 							<div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">
-								GAME PIN: <span className="text-gray-50">123456</span>
+								GAME PIN: <span className="text-gray-50">{pin || '123456'}</span>
 							</div>
 							<div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm flex items-center gap-2">
 								<span className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-300 text-yellow-700">★</span>
-								360
+								{score !== undefined ? score : 0}
 							</div>
 					</div>
       </div>

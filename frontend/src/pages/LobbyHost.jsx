@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { createStompClient } from '../api/websocket'
 
 const createAvatar = (name, from, to) => {
 	const initials = name
@@ -68,29 +69,63 @@ function LobbyHost() {
 		locationState.roomCode ||
 		'123456'
 
-	const currentUser = {
-		id: locationState.hostId || 'host-user',
-		name: locationState.hostName || 'Berk',
-		avatar: createAvatar(
-			locationState.hostName || 'Berk',
-			'#2dd4bf',
-			'#14b8a6'
-		),
-	}
-
-	const [players, setPlayers] = useState(mockPlayers)
+	const [players, setPlayers] = useState([])
 
 	useEffect(() => {
-		setPlayers((previousPlayers) => {
-			const alreadyJoined = previousPlayers.some(
-				(player) => player.id === currentUser.id
-			)
+		const fetchPlayers = async () => {
+			try {
+				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
+				if (response.ok) {
+					const data = await response.json()
+					setPlayers(data.players || [])
+				}
+			} catch (err) {
+				console.error("Error fetching initial players:", err)
+			}
+		}
+		fetchPlayers()
 
-			return alreadyJoined
-				? previousPlayers
-				: [currentUser, ...previousPlayers]
-		})
-	}, [currentUser.id])
+		const client = createStompClient()
+		client.onConnect = () => {
+			client.subscribe(`/topic/room/${gamePin}`, (message) => {
+				const event = JSON.parse(message.body)
+				if (event.type === 'PLAYER_JOINED') {
+					setPlayers(event.payload.players || [])
+				} else if (event.type === 'GAME_STARTED') {
+					navigate(`/host-live-game/${gamePin}`, {
+						state: { pin: gamePin }
+					})
+				}
+			})
+		}
+		client.activate()
+
+		return () => {
+			client.deactivate()
+		}
+	}, [gamePin, navigate])
+
+	const handleStartGame = async () => {
+		try {
+			const response = await fetch(`http://localhost:8080/api/games/start`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({ roomCode: gamePin }),
+			})
+
+			if (!response.ok) {
+				throw new Error('Failed to start game')
+			}
+
+			navigate(`/host-live-game/${gamePin}`, {
+				state: { pin: gamePin }
+			})
+		} catch (err) {
+			alert('Error starting game: ' + err.message)
+		}
+	}
 
 	return (
 		<div className="min-h-screen bg-white text-slate-900">
@@ -132,7 +167,7 @@ function LobbyHost() {
 
 							<div className="space-y-3">
 								{players.map((player) => {
-									const isCurrentUser = player.id === currentUser.id
+									const isCurrentUser = player.host === true
 
 									return (
 										<div
@@ -145,21 +180,21 @@ function LobbyHost() {
 										>
 											<div className="flex min-w-0 items-center gap-4">
 												<img
-													src={player.avatar}
-													alt={`${player.name} avatar`}
+													src={createAvatar(player.nickname || player.name || 'User', '#ff7a59', '#ff4d8d')}
+													alt={`${player.nickname || player.name} avatar`}
 													className="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm"
 												/>
 
 												<div className="min-w-0">
 													<p className="truncate text-base font-semibold text-slate-800">
-														{player.name}
+														{player.nickname || player.name}
 													</p>
 												</div>
 											</div>
 
 											{isCurrentUser ? (
 												<span className="ml-4 shrink-0 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
-													You
+													Host
 												</span>
 											) : null}
 										</div>
@@ -196,7 +231,7 @@ function LobbyHost() {
 
 							<button
 								type="button"
-								onClick={() => navigate('/host-live-game')}
+								onClick={handleStartGame}
 								className="mt-8 inline-flex w-44 items-center justify-center rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_25px_rgba(16,185,129,0.28)]"
 							>
 								Start

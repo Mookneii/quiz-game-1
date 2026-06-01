@@ -54,13 +54,15 @@ public class QuizService {
         );
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<QuizResponseDTO> getAllQuizzes() {
         return quizRepository.findAll()
                 .stream()
                 .map(quiz -> new QuizResponseDTO(
                         quiz.getId(),
                         quiz.getTitle(),
-                        quiz.getDescription()
+                        quiz.getDescription(),
+                        quiz.getQuestions() != null ? quiz.getQuestions().size() : 0
                 ))
                 .collect(Collectors.toList());
     }
@@ -69,10 +71,28 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
 
+        List<QuestionRequestDTO> questionDTOs = quiz.getQuestions().stream().map(q -> {
+            QuestionRequestDTO qDto = new QuestionRequestDTO();
+            qDto.setQuestionText(q.getQuestionText());
+            qDto.setTimeLimit(q.getTimeLimit());
+            qDto.setDifficulty(q.getDifficulty());
+            
+            List<ChoiceRequestDTO> cDtos = q.getChoices().stream().map(c -> {
+                ChoiceRequestDTO cDto = new ChoiceRequestDTO();
+                cDto.setChoiceText(c.getChoiceText());
+                cDto.setIsCorrect(c.getIsCorrect());
+                return cDto;
+            }).collect(Collectors.toList());
+            
+            qDto.setChoices(cDtos);
+            return qDto;
+        }).collect(Collectors.toList());
+
         return new QuizResponseDTO(
                 quiz.getId(),
                 quiz.getTitle(),
-                quiz.getDescription()
+                quiz.getDescription(),
+                questionDTOs
         );
     }
 

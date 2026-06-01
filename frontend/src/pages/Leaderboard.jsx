@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Trophy } from 'lucide-react'
 import Navbar_res from '../components/Navbar_res';
 
@@ -41,21 +41,32 @@ const Avatar = ({ name, rank }) => {
 }
 
 const LeaderboardPage = () => {
-	const [entries, setEntries] = useState(defaultEntries)
+	const location = useLocation()
+	const locationState = location.state || {}
+	const roomCode = locationState.pin || locationState.roomCode || '123456'
+
+	const [entries, setEntries] = useState([])
 	const [tab, setTab] = useState('rankings')
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return
-		try {
-			const raw = window.localStorage.getItem(STORAGE_KEY)
-			if (raw) {
-				const parsed = JSON.parse(raw)
-				if (Array.isArray(parsed) && parsed.length) setEntries(parsed)
+		const fetchResults = async () => {
+			try {
+				const response = await fetch(`http://localhost:8080/api/games/${roomCode}/results`)
+				if (response.ok) {
+					const data = await response.json()
+					const mappedEntries = data.map((item) => ({
+						name: item.nickname,
+						score: item.totalScore,
+						correctCount: item.correctCount,
+					})).sort((a, b) => b.score - a.score)
+					setEntries(mappedEntries)
+				}
+			} catch (err) {
+				console.error("Error fetching leaderboard results:", err)
 			}
-		} catch (e) {
-			// ignore parse errors
 		}
-	}, [])
+		fetchResults()
+	}, [roomCode])
 
 	return (
 		<div className="min-h-screen bg-linear-to-br from-[#15a085] via-[#2fb6a8] to-[#2b8bf5] text-gray-900 bg-[#f8f8f8] font-sans">
@@ -115,7 +126,7 @@ const LeaderboardPage = () => {
 					)}
 
 									{tab === 'review' && (
-										<ReviewSection />
+										<ReviewSection roomCode={roomCode} />
 									)}
 				</main>
 				<div className="mt-8 flex justify-center">
@@ -129,65 +140,40 @@ const LeaderboardPage = () => {
 export default LeaderboardPage
 
 // ReviewSection: loads quiz questions and answers from localStorage (common keys)
-function ReviewSection() {
+function ReviewSection({ roomCode }) {
 	const [questions, setQuestions] = useState(null)
 	const [answersMap, setAnswersMap] = useState({})
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return
-
-		// Try common storage keys where quiz data might be kept
-		const tryKeys = ['quiz-questions', 'quiz-data', 'current-quiz', 'generated-quiz', 'quiz-review']
-		let loaded = null
-		for (const key of tryKeys) {
+		const fetchQuizQuestions = async () => {
 			try {
-				const raw = window.localStorage.getItem(key)
-				if (!raw) continue
-				const parsed = JSON.parse(raw)
-				// parsed can be array of questions or object with questions
-				if (Array.isArray(parsed)) {
-					loaded = parsed
-					break
-				}
-				if (parsed && Array.isArray(parsed.questions)) {
-					loaded = parsed.questions
-					break
-				}
-			} catch (e) {
-				// ignore
+				const roomResponse = await fetch(`http://localhost:8080/api/rooms/${roomCode}`)
+				if (!roomResponse.ok) return
+				const roomData = await roomResponse.json()
+				const quizId = roomData.quizId
+				if (!quizId) return
+
+				const quizResponse = await fetch(`http://localhost:8080/api/quizzes/${quizId}`)
+				if (!quizResponse.ok) return
+				const quizData = await quizResponse.json()
+
+				const mappedQuestions = (quizData.questions || []).map((q, idx) => {
+					const correctChoice = q.choices?.find(c => c.isCorrect)
+					const correctText = correctChoice ? correctChoice.choiceText : ""
+					return {
+						id: q.id || idx,
+						text: q.questionText,
+						choices: q.choices?.map(c => c.choiceText) || [],
+						answer: correctText,
+					}
+				})
+				setQuestions(mappedQuestions)
+			} catch (err) {
+				console.error("Error fetching review questions:", err)
 			}
 		}
-
-		// try fallback keys for answers/player responses
-		const answerKeys = ['quiz-answers', 'answers', 'player-answers', 'quiz-answer-result']
-		const map = {}
-		for (const k of answerKeys) {
-			try {
-				const raw = window.localStorage.getItem(k)
-				if (!raw) continue
-				const parsed = JSON.parse(raw)
-				// if parsed is array of {questionId, answer}
-				if (Array.isArray(parsed)) {
-					parsed.forEach((a) => { if (a?.questionId != null) map[a.questionId] = a.answer; })
-				} else if (parsed && typeof parsed === 'object') {
-					// if object keyed by question id
-					Object.assign(map, parsed)
-				}
-			} catch (e) {}
-		}
-
-		if (!loaded) {
-			// sample fallback questions to review
-			loaded = [
-				{ id: 'q1', text: 'What is the capital of France?', choices: ['Paris','Berlin','Rome','Madrid'], answer: 'Paris' },
-				{ id: 'q2', text: '2 + 2 = ?', choices: ['3','4','5','6'], answer: '4' },
-				{ id: 'q3', text: 'Which language runs in a browser?', choices: ['Python','C++','JavaScript','Go'], answer: 'JavaScript' },
-			]
-		}
-
-		setQuestions(loaded)
-		setAnswersMap(map)
-	}, [])
+		fetchQuizQuestions()
+	}, [roomCode])
 
 	if (!questions) return <div className="mt-6 p-6">Loading review...</div>
 
