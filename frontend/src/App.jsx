@@ -12,8 +12,10 @@ import LeaderboardPage from "./pages/Leaderboard";
 import LobbyPlayer from "./pages/LobbyPlayer";
 import LobbyHost from "./pages/LobbyHost";
 import GameRoom from "./pages/GameRoom";
+import WaitingAnswer from "./pages/WaitingAnswer";
 import HostLiveGame from "./pages/HostLiveGame";
 import CreateQuiz from "./pages/CreateQuiz";
+import EditQuiz from "./pages/EditQuiz";
 
 export default function App() {
   return (
@@ -28,7 +30,8 @@ export default function App() {
         <Route path="/lobby/:pin" element={<LobbyPlayer />} />
         <Route path="/lobby-host" element={<LobbyHost />} />
         <Route path="/lobby-host/:pin" element={<LobbyHost />} />
-        <Route path="/game" element={<GameRoom />} /> 
+        <Route path="/game" element={<GameRoom />} />
+        <Route path="/waiting" element={<WaitingAnswer />} />
         <Route path="/host-live-game" element={<HostLiveGame />} />
         <Route path="/host-live-game/:pin" element={<HostLiveGame />} />
         <Route path="/signup" element={<Register />} />
@@ -38,6 +41,7 @@ export default function App() {
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/create-quiz" element={<CreateQuiz />} />
         <Route path="/create-quiz/:quizId" element={<CreateQuiz />} />
+        <Route path="/edit-quiz/:quizId" element={<EditQuiz />} />
       </Routes>
     </BrowserRouter>
   );

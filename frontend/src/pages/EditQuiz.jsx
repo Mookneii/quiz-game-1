@@ -238,8 +238,19 @@ export default function EditQuiz() {
 
       <div className="h-16 bg-white border-b flex items-center justify-between px-6">
         <button
+          onClick={() => navigate("/host")}
+          className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
+        >
+          ←
+        </button>
+
+        <h1 className="text-xl font-black text-emerald-500">QuizUp</h1>
+
+        <div />
+      </div>
+
       {/* EDIT PAGE */}
-      
+
       <div className="p-10">
 
           {/* HEADER */}
@@ -580,7 +591,6 @@ export default function EditQuiz() {
             )}
           </div>
         </div>
-      )}
 
       {/* DELETE MODAL */}
 
@@ -772,6 +782,7 @@ export default function EditQuiz() {
             </div>
           </div>
         </div>
-      </div>
+      )}
+    </div>
   );
 }

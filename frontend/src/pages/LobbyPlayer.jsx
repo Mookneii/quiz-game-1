@@ -65,6 +65,10 @@ function LobbyPlayer() {
 	const locationState = location.state || {}
 	const [gameStarted, setGameStarted] = useState(false)
 
+	// hostId is forwarded by JoinGame/LobbyHost so we can filter the host out
+	// of the player list even if the server record doesn't carry `host: true`.
+	const hostId = locationState.hostId || null
+
 	const gamePin =
 		params.pin ||
 		locationState.pin ||
@@ -178,12 +182,12 @@ function LobbyPlayer() {
 							<div className="flex items-center justify-between px-2 pb-5 pt-1">
 								<h2 className="text-2xl font-bold text-slate-900">Players</h2>
 								<span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-emerald-500">
-									{players.filter(p => !p.host).length} joined
+									{players.filter(p => !p.host && p.id !== hostId).length} joined
 								</span>
 							</div>
 
 							<div className="space-y-3">
-								{players.filter(p => !p.host).map((player) => {
+								{players.filter(p => !p.host && p.id !== hostId).map((player) => {
 									const isCurrentUser = player.id === currentUser.id
 
 									return (

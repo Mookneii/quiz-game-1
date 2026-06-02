@@ -4,38 +4,45 @@ import { createStompClient } from '../api/websocket'
 import api from '../api/http'
 
 const SHAPES = [
-  { color: 'bg-red-500', hover: 'hover:bg-red-600', active: 'bg-red-700', shape: '▲' },
-  { color: 'bg-blue-500', hover: 'hover:bg-blue-600', active: 'bg-blue-700', shape: '♦' },
-  { color: 'bg-yellow-500', hover: 'hover:bg-yellow-600', active: 'bg-yellow-700', shape: '●' },
-  { color: 'bg-green-500', hover: 'hover:bg-green-600', active: 'bg-green-700', shape: '■' }
-];
+  { bg: 'bg-red-500',    hover: 'hover:bg-red-600',    active: 'bg-red-700',    shape: '▲', label: 'A' },
+  { bg: 'bg-blue-500',   hover: 'hover:bg-blue-600',   active: 'bg-blue-700',   shape: '♦', label: 'B' },
+  { bg: 'bg-yellow-500', hover: 'hover:bg-yellow-600', active: 'bg-yellow-700', shape: '●', label: 'C' },
+  { bg: 'bg-green-500',  hover: 'hover:bg-green-600',  active: 'bg-green-700',  shape: '■', label: 'D' },
+]
 
 function GameRoom() {
   const location = useLocation()
   const navigate = useNavigate()
   const params = useParams()
   const locationState = location.state || {}
-  
-  const gamePin = params.pin || locationState.pin || '123456'
-  const playerId = locationState.playerId
-  const nickname = locationState.nickname || 'Player'
-  
-  const [question, setQuestion] = useState(locationState.question || null)
-  const [questionIndex, setQuestionIndex] = useState(locationState.questionIndex ?? null)
+
+  const gamePin    = params.pin || locationState.pin || '123456'
+  const playerId   = locationState.playerId
+  const nickname   = locationState.nickname || 'Player'
+
+  // ─── Question state ────────────────────────────────────────────────────────
+  // question comes in via location.state on the first render, and via WebSocket
+  // for every subsequent question. We initialise directly so it displays immediately.
+  const [question,       setQuestion]       = useState(locationState.question || null)
+  const [questionIndex,  setQuestionIndex]  = useState(locationState.questionIndex  ?? null)
   const [totalQuestions, setTotalQuestions] = useState(locationState.totalQuestions ?? null)
-  
-  const [selectedChoice, setSelectedChoice] = useState(null)
-  const [timeLeft, setTimeLeft] = useState(question?.timeLimit ?? null)
+
+  // ─── Timer ────────────────────────────────────────────────────────────────
+  // timeLeft is initialised from the question's timeLimit the moment we have one.
+  const [timeLeft, setTimeLeft] = useState(
+    locationState.question?.timeLimit ?? null
+  )
   const [isTimeUp, setIsTimeUp] = useState(false)
+
+  // Track when this question started so we can calculate timeTakenMs
   const startTimeRef = useRef(Date.now())
 
-  const [answerResult, setAnswerResult] = useState(null)
-  
-  const stateRef = useRef({ answerResult: null, timeLeft: null })
-  useEffect(() => {
-    stateRef.current = { answerResult, timeLeft }
-  }, [answerResult, timeLeft])
+  // ─── Answer state ─────────────────────────────────────────────────────────
+  const [selectedIndex, setSelectedIndex] = useState(null) // index 0-3
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // WebSocket — subscribe once per gamePin
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!gamePin) return
 
@@ -44,92 +51,84 @@ function GameRoom() {
     client.onConnect = () => {
       client.subscribe(`/topic/room/${gamePin}`, (message) => {
         try {
-          const event = JSON.parse(message.body)
+          const event   = JSON.parse(message.body)
           const payload = event.data ?? event.payload ?? {}
 
           if (event.type === 'QUESTION_STARTED') {
-            const { answerResult, timeLeft } = stateRef.current
-            
-            if (answerResult && timeLeft > 0) {
-              // We answered, but host clicked next before timer ended.
-              // Go to results for 2 seconds, then AnswerRes will bounce us back to GameRoom.
-              navigate('/results', {
-                replace: true,
-                state: { pin: gamePin, playerId, nickname, result: answerResult, nextQuestion: payload }
-              })
-            } else {
-              // Just start the new question directly
-              const newQ = payload.question || payload.questionDTO || null;
-              setQuestion(newQ)
-              setQuestionIndex(payload.questionIndex ?? null)
-              setTotalQuestions(payload.totalQuestions ?? null)
-              setSelectedChoice(null)
-              setAnswerResult(null)
-              setTimeLeft(newQ?.timeLimit ?? null)
-              setIsTimeUp(false)
-              startTimeRef.current = Date.now()
-            }
-          } else if (event.type === 'ANSWER_RESULT' && payload.playerId === playerId) {
-            setAnswerResult(payload)
-          } else if (event.type === 'GAME_FINISHED') {
+            // A new question started (this happens when host clicks Next while
+            // the player is still on THIS screen — i.e. they haven't answered yet).
+            // Reset everything and show the new question.
+            const newQ = payload.question || payload.questionDTO || null
+            setQuestion(newQ)
+            setQuestionIndex(payload.questionIndex  ?? null)
+            setTotalQuestions(payload.totalQuestions ?? null)
+            setSelectedIndex(null)
+            setIsTimeUp(false)
+            setTimeLeft(newQ?.timeLimit ?? null)
+            startTimeRef.current = Date.now()
+          }
+
+          if (event.type === 'GAME_FINISHED') {
             navigate('/leaderboard', { state: { pin: gamePin } })
           }
-        } catch (error) {
-          console.error(error)
+        } catch (err) {
+          console.error('GameRoom WS error:', err)
         }
       })
     }
+
     client.activate()
     return () => client.deactivate()
-  }, [gamePin, playerId, navigate, nickname])
+  }, [gamePin, navigate])
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Timer countdown — starts whenever timeLeft is a non-null positive number
+  // and the player hasn't answered yet.
+  // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (timeLeft === null || isTimeUp) return;
-    
+    if (timeLeft === null || isTimeUp || selectedIndex !== null) return
+
     if (timeLeft <= 0) {
       setIsTimeUp(true)
-      if (selectedChoice === null) {
-        handleAutoSubmit()
-      }
+      handleAutoSubmit()
       return
     }
 
-    const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1)
-    }, 1000)
-    
-    return () => clearInterval(timer)
-  }, [timeLeft, isTimeUp, selectedChoice])
+    const id = setInterval(() => setTimeLeft((prev) => prev - 1), 1000)
+    return () => clearInterval(id)
+  }, [timeLeft, isTimeUp, selectedIndex])
 
-  useEffect(() => {
-    if (isTimeUp && answerResult) {
-      navigate('/results', {
-        replace: true,
-        state: { pin: gamePin, playerId, nickname, result: answerResult }
-      });
-    }
-  }, [isTimeUp, answerResult, navigate, gamePin, playerId, nickname]);
-
+  // ─────────────────────────────────────────────────────────────────────────
+  // Auto-submit when time runs out (no answer selected)
+  // ─────────────────────────────────────────────────────────────────────────
   const handleAutoSubmit = async () => {
-    if (!question || selectedChoice !== null) return;
-    
+    if (!question || selectedIndex !== null) return
     try {
       await api.post('/api/games/answer', {
-        roomCode: gamePin,
+        roomCode:    gamePin,
         playerId,
-        questionId: question.id,
-        choiceId: -1, // No choice
-        timeTakenMs: (question.timeLimit || 0) * 1000
+        questionId:  question.id,
+        choiceId:    -1,
+        timeTakenMs: (question.timeLimit || 0) * 1000,
       })
     } catch (err) {
-      console.error(err)
+      console.error('Auto-submit error:', err)
     }
+    // After auto-submit → navigate to WaitingAnswer so the player still sees
+    // the waiting screen and receives AnswerRes when host clicks Next.
+    navigate('/waiting', {
+      replace: true,
+      state: { pin: gamePin, playerId, nickname, selectedIndex: null },
+    })
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Player picks a choice
+  // ─────────────────────────────────────────────────────────────────────────
   const handleChoice = async (choiceId, index) => {
-    if (selectedChoice !== null || isTimeUp) return
-    setSelectedChoice(index)
-    
+    if (selectedIndex !== null || isTimeUp) return
+    setSelectedIndex(index)
+
     const timeTakenMs = Date.now() - startTimeRef.current
 
     try {
@@ -138,72 +137,119 @@ function GameRoom() {
         playerId,
         questionId: question.id,
         choiceId,
-        timeTakenMs
+        timeTakenMs,
+      })
+      // ✅ Navigate immediately to the Kahoot-style waiting screen
+      navigate('/waiting', {
+        replace: true,
+        state: { pin: gamePin, playerId, nickname, selectedIndex: index },
       })
     } catch (err) {
-      console.error(err)
-      setSelectedChoice(null) // Revert on failure
+      console.error('Answer submit error:', err)
+      setSelectedIndex(null) // revert on failure
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Derived
+  // ─────────────────────────────────────────────────────────────────────────
   const choices = question?.choices || []
-  
+
+  // Timer colour: green → yellow → red as time shrinks
+  const timerColor =
+    timeLeft === null
+      ? 'bg-slate-700'
+      : timeLeft > (question?.timeLimit ?? 30) * 0.5
+      ? 'bg-emerald-500'
+      : timeLeft > (question?.timeLimit ?? 30) * 0.25
+      ? 'bg-yellow-500'
+      : 'bg-red-500'
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <header className="bg-white px-6 py-4 flex justify-between items-center shadow-sm">
-        <div className="font-bold text-xl text-emerald-500">QuizUp</div>
-        <div className="flex gap-4">
-          <div className="font-semibold text-slate-700 px-4 py-2 bg-slate-100 rounded-full">PIN: {gamePin}</div>
-          <div className="font-bold text-emerald-600 px-4 py-2 bg-emerald-50 rounded-full">{nickname}</div>
+    <div className="min-h-screen bg-slate-900 flex flex-col">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 shadow-lg">
+        <div className="font-extrabold text-xl text-emerald-400">QuizUp</div>
+        <div className="flex gap-3 items-center">
+          {/* Question counter */}
+          {questionIndex !== null && totalQuestions !== null && (
+            <div className="bg-white/10 rounded-full px-4 py-1.5 text-xs font-bold text-white/70 uppercase tracking-widest">
+              Q {questionIndex + 1} / {totalQuestions}
+            </div>
+          )}
+          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
+            PIN: {gamePin}
+          </div>
+          <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-4 py-2 text-sm font-bold text-emerald-400">
+            {nickname}
+          </div>
         </div>
       </header>
-      
-      <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl mx-auto">
+
+      {/* ── Main ───────────────────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8 w-full max-w-5xl mx-auto">
+
         {!question ? (
-          <div className="text-3xl font-black text-slate-400">Waiting for next question...</div>
-        ) : selectedChoice !== null ? (
-          <div className="flex flex-col items-center justify-center space-y-6">
-            <div className="text-4xl font-black text-slate-700">Waiting for host to click next...</div>
-            <div className="text-xl font-bold text-slate-500">You submitted your answer!</div>
-            <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mt-8"></div>
+          /* No question yet */
+          <div className="flex flex-col items-center gap-6 text-center">
+            <div className="h-16 w-16 rounded-full border-4 border-emerald-400 border-t-transparent animate-spin" />
+            <p className="text-2xl font-black text-white/60">Waiting for next question...</p>
           </div>
         ) : (
           <>
-            <div className="w-full flex justify-between items-start mb-8">
-              <div className="flex flex-col gap-2">
-                <div className="text-2xl font-bold text-slate-500">
-                  {questionIndex !== null ? `Question ${questionIndex + 1}` : ''}
-                </div>
-                {/* DISPLAY QUESTION TEXT */}
-                <h1 className="text-4xl font-black text-slate-800 max-w-3xl">
+            {/* ── Question + Timer row ─────────────────────────────────── */}
+            <div className="w-full flex items-start justify-between gap-6">
+              {/* Question text */}
+              <div className="flex-1">
+                <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
                   {question.questionText}
                 </h1>
               </div>
+
+              {/* Timer circle */}
               {timeLeft !== null && (
-                <div className="flex items-center justify-center w-24 h-24 rounded-full bg-slate-800 text-white text-4xl font-black shadow-lg shrink-0 ml-4">
+                <div
+                  className={`
+                    shrink-0 flex items-center justify-center
+                    h-20 w-20 rounded-full text-white text-4xl font-black
+                    shadow-xl transition-colors duration-500
+                    ${timerColor}
+                  `}
+                >
                   {timeLeft}
                 </div>
               )}
             </div>
 
-            <div className="w-full grid grid-cols-2 gap-4 h-96">
+            {/* ── Choices grid ─────────────────────────────────────────── */}
+            <div className="w-full grid grid-cols-2 gap-4" style={{ minHeight: '320px' }}>
               {choices.map((c, i) => {
-                const shapeStyle = SHAPES[i % 4];
-                
+                const s = SHAPES[i % 4]
                 return (
                   <button
                     key={c.id || i}
                     onClick={() => handleChoice(c.id, i)}
-                    disabled={selectedChoice !== null || isTimeUp}
+                    disabled={selectedIndex !== null || isTimeUp}
                     className={`
-                      relative overflow-hidden rounded-2xl flex items-center justify-center shadow-md transition-all
-                      ${shapeStyle.color} hover:${shapeStyle.hover}
+                      relative overflow-hidden rounded-2xl flex items-center justify-center
+                      shadow-lg transition-all duration-150 active:scale-95
+                      disabled:opacity-60 disabled:cursor-not-allowed
+                      ${s.bg} ${s.hover}
                     `}
                   >
-                    <span className="text-white opacity-20 text-9xl absolute pointer-events-none">
-                      {shapeStyle.shape}
+                    {/* Background shape watermark */}
+                    <span className="text-white opacity-15 text-[9rem] absolute pointer-events-none select-none">
+                      {s.shape}
                     </span>
-                    <span className="text-white text-3xl font-bold z-10 px-8 text-center break-words shadow-sm">
+                    {/* Option label pill */}
+                    <span className="absolute top-3 left-3 bg-black/20 rounded-full w-8 h-8 flex items-center justify-center text-white font-black text-sm">
+                      {s.label}
+                    </span>
+                    {/* Choice text */}
+                    <span className="text-white text-2xl font-bold z-10 px-8 text-center break-words leading-snug">
                       {c.choiceText}
                     </span>
                   </button>
