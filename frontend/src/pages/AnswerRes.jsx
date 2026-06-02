@@ -1,7 +1,8 @@
 import Navbar_res from "../components/Navbar_res";
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Flame, Target, XCircle, Trophy, Zap } from 'lucide-react';
+import { createStompClient } from '../api/websocket';
 
 const STORAGE_KEY = 'quiz-answer-result';
 const TOTAL_POINTS_KEY = 'quiz-total-points';
@@ -9,10 +10,10 @@ const TOTAL_POINTS_KEY = 'quiz-total-points';
 const defaultResult = {
 	isCorrect: true,
 	pointsEarned: 10,
-	streak: 3,
-	totalPoints: 120,
-	currentQuestion: 2,
-	totalQuestions: 10,
+	streak: 0,
+	totalPoints: 0,
+	currentQuestion: 1,
+	totalQuestions: 1,
 };
 
 const readStoredResult = () => {
@@ -35,17 +36,85 @@ const readStoredResult = () => {
 
 const AnswerRes = () => {
 	const location = useLocation();
-	const [isCorrect, setIsCorrect] = useState(Boolean(defaultResult.isCorrect));
+	const navigate = useNavigate();
+	
+	const locationState = location.state || {};
+	const gamePin = locationState.pin;
+	const playerId = locationState.playerId;
+	const nickname = locationState.nickname;
+	const serverResult = locationState.result || {};
 
 	const result = {
 		...defaultResult,
 		...(readStoredResult() ?? {}),
-		...(location.state ?? {}),
+		isCorrect: serverResult.correct ?? defaultResult.isCorrect,
+		pointsEarned: serverResult.points ?? defaultResult.pointsEarned,
+		streak: serverResult.streak ?? defaultResult.streak,
+		totalPoints: serverResult.totalScore ?? defaultResult.totalPoints,
+		currentQuestion: serverResult.questionIndex !== undefined ? serverResult.questionIndex + 1 : defaultResult.currentQuestion,
+		totalQuestions: serverResult.totalQuestions ?? defaultResult.totalQuestions,
 	};
+	
+	const isCorrect = Boolean(result.isCorrect);
 
 	useEffect(() => {
-		setIsCorrect(Boolean(result.isCorrect));
-	}, [result.isCorrect]);
+		if (locationState.nextQuestion) {
+			const timer = setTimeout(() => {
+				const nextQ = locationState.nextQuestion;
+				navigate('/game', {
+					replace: true,
+					state: {
+						pin: gamePin,
+						playerId,
+						nickname,
+						question: nextQ.question || nextQ.questionDTO || null,
+						questionIndex: nextQ.questionIndex ?? null,
+						totalQuestions: nextQ.totalQuestions ?? null,
+					}
+				});
+			}, 2000);
+			return () => clearTimeout(timer);
+		}
+	}, [locationState.nextQuestion, navigate, gamePin, playerId, nickname]);
+
+	useEffect(() => {
+		if (!gamePin) return;
+
+		const client = createStompClient();
+
+		client.onConnect = () => {
+			client.subscribe(`/topic/room/${gamePin}`, (message) => {
+				try {
+					const event = JSON.parse(message.body);
+					const payload = event.data ?? event.payload ?? {};
+
+					if (event.type === 'QUESTION_STARTED') {
+						navigate('/game', {
+							replace: true,
+							state: {
+								pin: gamePin,
+								playerId,
+								nickname,
+								question: payload.question || payload.questionDTO || null,
+								questionIndex: payload.questionIndex ?? null,
+								totalQuestions: payload.totalQuestions ?? null,
+							}
+						});
+					} else if (event.type === 'GAME_FINISHED') {
+						navigate('/leaderboard', { state: { pin: gamePin } });
+					}
+				} catch (error) {
+					console.error(error);
+				}
+			});
+		};
+
+		client.activate();
+
+		return () => {
+			client.deactivate();
+		};
+	}, [gamePin, navigate, playerId, nickname]);
 
 	const currentQuestion = Number(result.currentQuestion) || 1;
 	const totalQuestions = Number(result.totalQuestions) || 1;
@@ -71,15 +140,6 @@ const AnswerRes = () => {
 			<Navbar_res/>
 			<div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-4xl items-center px-4 py-10 sm:px-6 lg:px-8">
 				<div className="w-full rounded-[2rem] bg-linear-to-b from-[#0d6b46] to-[#0f8a61] px-6 py-10 text-center shadow-[0_20px_70px_rgba(15,138,97,0.22)] sm:px-8 lg:px-10">
-					<div className="flex justify-end">
-						<button
-							type="button"
-							onClick={() => setIsCorrect((value) => !value)}
-							className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-						>
-							Switch mark
-						</button>
-					</div>
 
 					<div className="rounded-[2rem] bg-linear-to-b from-[#0d6b46] to-[#0f8a61] px-6 py-10 text-center shadow-[0_20px_70px_rgba(15,138,97,0.22)] sm:px-8 lg:px-10">
 						<div className="mx-auto flex h-28 w-28 items-center justify-center rounded-full bg-[#e8fcef] shadow-[0_0_0_16px_rgba(232,252,239,0.16)]">

@@ -316,7 +316,7 @@ export default function HostDashboard() {
                       <button
                         onClick={() =>
                           navigate(
-                            `/quiz/${quiz.id}`
+                            `/create-quiz/${quiz.id}`
                           )
                         }
                         className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-semibold transition"

@@ -2,7 +2,9 @@
 // FULLY FIXED QUIZ BUILDER
 // ================================================
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { generateQuizFromDocument, createQuiz, getQuiz } from "../api/quiz";
 
 import {
   ArrowLeft,
@@ -17,6 +19,9 @@ import {
 } from "lucide-react";
 
 export default function QuizBuilder() {
+  const navigate = useNavigate();
+  const { quizId } = useParams();
+  
   const coverInputRef = useRef(null);
   const aiFileInputRef = useRef(null);
 
@@ -72,7 +77,37 @@ export default function QuizBuilder() {
   };
 
   // ========================================
-  // FAKE AI GENERATE
+  // LOAD QUIZ IF EDITING
+  // ========================================
+  useEffect(() => {
+    if (quizId) {
+      getQuiz(quizId)
+        .then((res) => {
+          if (res.data) {
+            setQuiz({
+              title: res.data.title || "",
+              description: res.data.description || "",
+              cover: null, // Assume no cover for simplicity unless handled
+            });
+            const loadedQs = (res.data.questions || []).map(q => {
+              const correctAnswerIdx = q.choices?.findIndex(c => c.isCorrect);
+              return {
+                question: q.questionText,
+                answers: q.choices?.map(c => c.choiceText) || ["", "", "", ""],
+                correct: correctAnswerIdx >= 0 ? correctAnswerIdx : null,
+                difficulty: "medium", // Default, could map from data if it existed
+              };
+            });
+            setQuestions(loadedQs);
+            setPage("edit");
+          }
+        })
+        .catch((err) => console.error("Error loading quiz", err));
+    }
+  }, [quizId]);
+
+  // ========================================
+  // REAL AI GENERATE
   // ========================================
 
   const handleAIImport = async (e) => {
@@ -82,59 +117,47 @@ export default function QuizBuilder() {
 
     setIsGeneratingAI(true);
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, 2000)
-    );
+    try {
+      const response = await generateQuizFromDocument(
+        file,
+        "MEDIUM",
+        "MCQ",
+        5, // Requesting 5 questions by default
+        "llama3.2:latest"
+      );
 
-    const generatedQuestions = [
-      {
-        question:
-          "Which organ pumps blood throughout the human body?",
-        answers: [
-          "Lungs",
-          "Heart",
-          "Brain",
-          "Kidney",
-        ],
-        correct: 1,
-        difficulty: "easy",
-      },
-
-      {
-        question:
-          "What is the chemical symbol for gold?",
-        answers: [
-          "Ag",
-          "Au",
-          "Gd",
-          "Go",
-        ],
-        correct: 1,
-        difficulty: "medium",
-      },
-
-      {
-        question:
-          "Which data structure uses FIFO order?",
-        answers: [
-          "Stack",
-          "Queue",
-          "Tree",
-          "Graph",
-        ],
-        correct: 1,
-        difficulty: "hard",
-      },
-    ];
-
-    setQuestions((prev) => [
-      ...prev,
-      ...generatedQuestions,
-    ]);
-
-    setIsGeneratingAI(false);
-
-    e.target.value = "";
+      if (response?.data?.questions) {
+        const generatedQuestions = response.data.questions.map(q => ({
+          question: q.questionText || q.text || "",
+          answers: [
+            q.choices?.[0] || "",
+            q.choices?.[1] || "",
+            q.choices?.[2] || "",
+            q.choices?.[3] || ""
+          ],
+          correct: typeof q.correctChoiceIndex === "number" ? q.correctChoiceIndex : 0,
+          difficulty: q.difficulty?.toLowerCase() || "medium",
+        }));
+        
+        setQuestions((prev) => [
+          ...prev,
+          ...generatedQuestions,
+        ]);
+        
+        // Also update quiz info if it's empty
+        if (!quiz.title && response.data.title) {
+          setQuiz(prev => ({...prev, title: response.data.title}));
+        }
+        if (!quiz.description && response.data.description) {
+          setQuiz(prev => ({...prev, description: response.data.description}));
+        }
+      }
+    } catch (err) {
+      alert("Error generating quiz: " + (err.response?.data?.message || err.message));
+    } finally {
+      setIsGeneratingAI(false);
+      e.target.value = "";
+    }
   };
 
   // ========================================
@@ -231,8 +254,8 @@ export default function QuizBuilder() {
       <div className="h-16 bg-white border-b flex items-center justify-between px-6">
         <button
           onClick={() =>
-            page === "create"
-              ? alert("Go Dashboard")
+            page === "create" && !quizId
+              ? navigate("/host")
               : setPage("create")
           }
           className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
@@ -418,9 +441,38 @@ export default function QuizBuilder() {
               {/* DONE */}
 
               <button
-                onClick={() =>
-                  alert("Go Dashboard")
-                }
+                onClick={async () => {
+                  try {
+                    const mappedQuestions = questions.map(q => ({
+                      questionText: q.question,
+                      choices: q.answers.map((ans, i) => ({
+                        choiceText: ans,
+                        isCorrect: i === q.correct
+                      }))
+                    }));
+                    
+                    const token = localStorage.getItem("token");
+                    const userStr = localStorage.getItem("user");
+                    const user = userStr ? JSON.parse(userStr) : null;
+                    
+                    if (!token) {
+                      navigate("/login");
+                      return;
+                    }
+                    
+                    // Actually the createQuiz API just takes SaveQuizRequest
+                    await createQuiz({
+                      id: quizId || null,
+                      title: quiz.title || "Untitled Quiz",
+                      description: quiz.description || "",
+                      questions: mappedQuestions
+                    });
+                    
+                    navigate("/host");
+                  } catch (err) {
+                    alert("Error saving quiz: " + err.message);
+                  }
+                }}
                 className="bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold"
               >
                 Done

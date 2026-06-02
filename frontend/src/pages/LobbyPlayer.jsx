@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createStompClient } from '../api/websocket'
+import { getRoomDetails } from '../api/room'
 
 const createAvatar = (name, from, to) => {
 	const initials = name
@@ -83,16 +84,16 @@ function LobbyPlayer() {
 	const [players, setPlayers] = useState([])
 
 	useEffect(() => {
-		setPlayers((previousPlayers) => {
-			const alreadyJoined = previousPlayers.some(
-				(player) => player.id === currentUser.id
-			)
-
-			return alreadyJoined
-				? previousPlayers
-				: [currentUser, ...previousPlayers]
-		})
-	}, [currentUser.id])
+		if (gamePin) {
+			getRoomDetails(gamePin)
+				.then((res) => {
+					if (res.data?.players) {
+						setPlayers(res.data.players)
+					}
+				})
+				.catch((err) => console.error("Failed to load players", err))
+		}
+	}, [gamePin])
 
 	useEffect(() => {
 		if (!gamePin) {
@@ -106,6 +107,12 @@ function LobbyPlayer() {
 				try {
 					const event = JSON.parse(message.body)
 					const payload = event.data ?? event.payload ?? {}
+
+					if (event.type === 'PLAYER_JOINED') {
+						if (payload.players) {
+							setPlayers(payload.players)
+						}
+					}
 
 					if (event.type === 'GAME_STARTED') {
 						setGameStarted(true)
@@ -171,12 +178,12 @@ function LobbyPlayer() {
 							<div className="flex items-center justify-between px-2 pb-5 pt-1">
 								<h2 className="text-2xl font-bold text-slate-900">Players</h2>
 								<span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-emerald-500">
-									{players.length} joined
+									{players.filter(p => !p.host).length} joined
 								</span>
 							</div>
 
 							<div className="space-y-3">
-								{players.map((player) => {
+								{players.filter(p => !p.host).map((player) => {
 									const isCurrentUser = player.id === currentUser.id
 
 									return (

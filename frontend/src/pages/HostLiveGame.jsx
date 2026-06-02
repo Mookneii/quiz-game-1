@@ -30,13 +30,7 @@ const createAvatar = (name, from, to) => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
-const sidebarPlayers = [
-	{ name: 'Alex', score: 1250, avatar: createAvatar('Alex', '#667eea', '#764ba2') },
-	{ name: 'Jordan', score: 1100, avatar: createAvatar('Jordan', '#cc2b5e', '#753a88') },
-	{ name: 'Taylor', score: 950, avatar: createAvatar('Taylor', '#2193b0', '#6dd5ed') },
-	{ name: 'Sam', score: 880, avatar: createAvatar('Sam', '#1d976c', '#93f9b9') },
-	{ name: 'Morgan', score: 720, avatar: createAvatar('Morgan', '#f12711', '#f5af19') },
-]
+// removed sidebarPlayers array
 
 function HostLiveGame() {
 	const navigate = useNavigate()
@@ -62,9 +56,12 @@ function HostLiveGame() {
 	const firstQuestionRequestedRef = useRef(false)
 	const [questionError, setQuestionError] = useState('')
 
-	const totalPlayers = players.length
+	const totalPlayers = players.filter(p => !p.host).length
 	const answeredCount = answeredPlayers.length
 	const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
+	
+	const isLastQuestion = questionIndex != null && totalQuestions != null && questionIndex + 1 >= totalQuestions
+	const progressPercent = totalQuestions > 0 ? Math.round(((questionIndex + 1) / totalQuestions) * 100) : 0
 
 	useEffect(() => {
 		let cancelled = false
@@ -161,13 +158,23 @@ function HostLiveGame() {
 		}
 	}, [gamePin, navigate])
 
-	const handleConfirmExit = () => {
+	const handleConfirmExit = async () => {
 		setIsExitModalOpen(false)
-		navigate('/')
+		try {
+			await api.post('/api/games/end', { roomCode: gamePin })
+		} catch (error) {
+			console.error('Failed to end game', error)
+		}
+		navigate('/host')
 	}
 
-	const handleEndGame = () => {
-		navigate('/leaderboard')
+	const handleEndGame = async () => {
+		try {
+			await api.post('/api/games/end', { roomCode: gamePin })
+		} catch (error) {
+			console.error('Failed to end game', error)
+		}
+		navigate('/leaderboard', { state: { pin: gamePin } })
 	}
 
 	const handleNextQuestion = async () => {
@@ -215,11 +222,11 @@ function HostLiveGame() {
 					<div className="flex justify-end">
 						<div className="flex items-center gap-4 rounded-full bg-white/15 px-4 py-2 text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm">
 							<div className="flex -space-x-2">
-								{sidebarPlayers.slice(0, 3).map((player) => (
+								{players.filter(p => !p.host).slice(0, 3).map((player) => (
 									<img
-										key={player.name}
-										src={player.avatar}
-										alt={`${player.name} avatar`}
+										key={player.nickname || player.name || player.id}
+										src={createAvatar(player.nickname || player.name || 'User', '#667eea', '#764ba2')}
+										alt={`${player.nickname || player.name} avatar`}
 										className="h-8 w-8 rounded-full border-2 border-white object-cover"
 									/>
 								))}
@@ -245,7 +252,7 @@ function HostLiveGame() {
 						</div>
 
 						<div className="space-y-3">
-							{players.map((player) => (
+							{players.filter(p => !p.host).map((player) => (
 								<div
 									key={player.id}
 									className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm"
@@ -272,13 +279,25 @@ function HostLiveGame() {
 					</aside>
 
 					<section className="flex min-h-155 flex-col rounded-[34px] bg-linear-to-br from-[#f3f4f6] via-[#eef0ff] to-[#cbd5ff] p-8 shadow-[0_18px_42px_rgba(0,0,0,0.14)] lg:p-10">
-						<div className="inline-flex w-fit items-center gap-2 rounded-full bg-violet-200/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-violet-600 shadow-sm">
-							<span
-								className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500' : 'bg-violet-500'}`}
-							/>
-							{currentQuestion && questionIndex != null && totalQuestions != null
-								? `Question ${questionIndex + 1} of ${totalQuestions}`
-								: 'Preparing first question...'}
+						<div className="flex flex-col gap-2">
+							<div className="inline-flex w-fit items-center gap-2 rounded-full bg-violet-200/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-violet-600 shadow-sm">
+								<span
+									className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500' : 'bg-violet-500'}`}
+								/>
+								{currentQuestion && questionIndex != null && totalQuestions != null
+									? `Question ${questionIndex + 1} of ${totalQuestions}`
+									: 'Preparing first question...'}
+							</div>
+							
+							{/* Question Progress Bar */}
+							{totalQuestions > 0 && (
+								<div className="h-1.5 w-64 overflow-hidden rounded-full bg-slate-200">
+									<div
+										className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+										style={{ width: `${progressPercent}%` }}
+									/>
+								</div>
+							)}
 						</div>
 
 						<div className="mt-12 max-w-4xl">
@@ -310,8 +329,8 @@ function HostLiveGame() {
 
 						<div className="mt-auto flex items-end justify-between gap-4 pb-5 pt-10">
 							<div className="max-w-2xl flex-1">
-								<div className="mb-3 text-lg font-semibold text-white/70">
-									{answeredCount} <span className="text-white/45">/24 players answered</span>
+								<div className="mb-3 text-lg font-semibold text-slate-800">
+									{answeredCount} <span className="text-slate-600">/{totalPlayers} players answered</span>
 								</div>
 								<div className="h-3 w-full overflow-hidden rounded-full bg-white/35 shadow-inner">
 									<div
@@ -343,14 +362,16 @@ function HostLiveGame() {
 									End
 								</button>
 
-								<button
-									type="button"
-									onClick={handleNextQuestion}
-									disabled={!currentQuestion || nextQuestionLoading}
-									className="inline-flex h-14 min-w-52 items-center justify-center rounded-2xl bg-blue-500 px-8 text-sm font-extrabold uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(37,99,235,0.35)] transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
-								>
-									{nextQuestionLoading ? 'Loading...' : 'Next Question >'}
-								</button>
+								{!isLastQuestion && (
+									<button
+										type="button"
+										onClick={handleNextQuestion}
+										disabled={!currentQuestion || nextQuestionLoading}
+										className="inline-flex h-14 min-w-52 items-center justify-center rounded-2xl bg-blue-500 px-8 text-sm font-extrabold uppercase tracking-[0.2em] text-white shadow-[0_10px_24px_rgba(37,99,235,0.35)] transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
+									>
+										{nextQuestionLoading ? 'Loading...' : 'Next Question >'}
+									</button>
+								)}
 							</div>
 						</div>
 					</section>

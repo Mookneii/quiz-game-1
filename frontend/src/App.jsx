@@ -37,6 +37,7 @@ export default function App() {
         <Route path="/results" element={<AnswerRes />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/create-quiz" element={<CreateQuiz />} />
+        <Route path="/create-quiz/:quizId" element={<CreateQuiz />} />
       </Routes>
     </BrowserRouter>
   );

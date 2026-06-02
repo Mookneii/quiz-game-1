@@ -174,7 +174,21 @@ public class GameService {
         player.setScore(updatedScore);
         roomPlayerRepository.save(player);
 
-        AnswerResultDTO result = new AnswerResultDTO(player.getId(), correct, points, updatedScore);
+        List<Question> questions = questionRepository.findByQuizIdOrderByIdAsc(room.getQuiz().getId());
+        int questionIndex = questions.indexOf(question);
+        int totalQuestions = questions.size();
+
+        List<Answer> playerAnswers = answerRepository.findByRoomIdAndPlayerIdOrderByIdDesc(room.getId(), player.getId());
+        int streak = 0;
+        for (Answer a : playerAnswers) {
+            if (Boolean.TRUE.equals(a.getCorrect())) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+
+        AnswerResultDTO result = new AnswerResultDTO(player.getId(), correct, points, updatedScore, streak, questionIndex, totalQuestions);
         messagingTemplate.convertAndSend(
                 "/topic/room/" + roomCode,
                 new GameEvent("ANSWER_RESULT", result)

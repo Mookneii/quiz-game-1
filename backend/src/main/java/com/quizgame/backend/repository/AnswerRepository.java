@@ -8,4 +8,5 @@ import java.util.List;
 public interface AnswerRepository extends JpaRepository<Answer, Long> {
     List<Answer> findByRoomId(Long roomId);
     long countByRoomIdAndPlayerIdAndCorrectTrue(Long roomId, Long playerId);
+    List<Answer> findByRoomIdAndPlayerIdOrderByIdDesc(Long roomId, Long playerId);
 }
