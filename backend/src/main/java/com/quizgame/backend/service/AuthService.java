@@ -13,11 +13,14 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+private final PasswordEncoder passwordEncoder;
+private final JwtService jwtService;
+    
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     public AuthResponse register(AuthRegisterRequest request) {
@@ -39,7 +42,8 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         User saved = userRepository.save(user);
-        return new AuthResponse(saved.getId(), saved.getName(), saved.getEmail());
+        String token = jwtService.generateToken(saved);
+        return new AuthResponse(token, saved.getId(), saved.getName(), saved.getEmail());
     }
 
     public AuthResponse login(AuthLoginRequest request) {
@@ -56,7 +60,13 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BadRequestException("Invalid credentials");
         }
+          String token =
+            jwtService.generateToken(user);
 
-        return new AuthResponse(user.getId(), user.getName(), user.getEmail());
+         return new AuthResponse(
+            token,
+            user.getId(),
+            user.getName(),
+            user.getEmail());
     }
 }
