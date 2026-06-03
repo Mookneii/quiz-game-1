@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../api/http'
 import { createStompClient } from '../api/websocket'
 
+// Creates a circular SVG avatar image using the player's initials and a gradient color.
+// 'name' is used to extract initials; 'from' and 'to' are the gradient start/end colors.
+// Returns a data URL string that can be used directly as an <img> src.
 const createAvatar = (name, from, to) => {
 	const initials = name
 		.split(/\s+/)
@@ -30,6 +33,8 @@ const createAvatar = (name, from, to) => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
+// Mock player list used as placeholder data during development/UI testing.
+// These are not real players — they are replaced by live data from the server.
 const mockPlayers = [
 	{
 		id: 'beun',
@@ -58,13 +63,22 @@ const mockPlayers = [
 	},
 ]
 
+// Main component for the host's waiting lobby.
+// Shows all joined players in real time and lets the host start the game
+// once enough players have joined.
 function LobbyHost() {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const params = useParams()
 	const locationState = location.state || {}
+
+	// True while the start-game API call is in progress (disables the Start button)
 	const [isStarting, setIsStarting] = useState(false)
+
+	// Error message shown below the Start button if the API call fails
 	const [startError, setStartError] = useState('')
+
+	// Build the host's own user object from navigation state
 	const currentUser = {
 		id: locationState.hostId || 'host-user',
 		name: locationState.hostName || 'Berk',
@@ -75,23 +89,30 @@ function LobbyHost() {
 		),
 	}
 
+	// Resolve the game PIN from URL params or navigation state (fallback: '123456')
 	const gamePin =
 		params.pin ||
 		locationState.pin ||
 		locationState.roomCode ||
 		'123456'
 
+	// Live list of non-host players who have joined the lobby
 	const [players, setPlayers] = useState([])
 
+	// On mount: fetches current players from the REST API, then opens a WebSocket
+	// connection to receive real-time PLAYER_JOINED events.
+	// Cleans up the WebSocket on unmount.
 	useEffect(() => {
 		if (!gamePin) {
 			return undefined
 		}
 
+		// Loads the current player list from the server when the lobby first opens
 		const loadRoom = async () => {
 			try {
 				const response = await api.get(`/api/rooms/${gamePin}`)
 				const roomPlayers = response.data?.players || []
+				// Filter out the host so only regular players are shown
 				setPlayers(roomPlayers.filter((player) => !player.host))
 			} catch (error) {
 				// Keep the lobby usable even if the initial load fails.
@@ -100,6 +121,7 @@ function LobbyHost() {
 
 		loadRoom()
 
+		// Create a STOMP WebSocket client and subscribe to the room topic
 		const client = createStompClient()
 		client.onConnect = () => {
 			client.subscribe(`/topic/room/${gamePin}`, (message) => {
@@ -108,6 +130,7 @@ function LobbyHost() {
 					const payload = event.data ?? event.payload ?? {}
 
 					if (event.type === 'PLAYER_JOINED') {
+						// A new player joined — update the list with the server's full player array
 						setPlayers((previousPlayers) => {
 							const nextPlayers = payload.players || previousPlayers
 							return nextPlayers.filter((player) => !player.host)
@@ -121,11 +144,14 @@ function LobbyHost() {
 
 		client.activate()
 
+		// Disconnect WebSocket when the component unmounts
 		return () => {
 			client.deactivate()
 		}
 	}, [gamePin])
 
+	// Called when the host clicks the "Start" button.
+	// Posts a start-game request to the server, then navigates to the live game screen.
 	const handleStartGame = async () => {
 		setStartError('')
 		setIsStarting(true)
@@ -135,6 +161,7 @@ function LobbyHost() {
 				roomCode: gamePin,
 			})
 
+			// Navigate to the host's live game page, passing game info via state
 			navigate(`/host-live-game/${gamePin}`, {
 				state: {
 					pin: gamePin,
@@ -143,6 +170,7 @@ function LobbyHost() {
 				},
 			})
 		} catch (error) {
+			// Show an error message below the button if the request fails
 			setStartError(
 				error?.response?.data?.message || 'Unable to start the game'
 			)
@@ -154,6 +182,7 @@ function LobbyHost() {
 	return (
 		<div className="min-h-screen bg-white text-slate-900">
 			<div className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-4 sm:px-8 lg:px-10">
+				{/* Top header: QuizUp logo on the left, Game PIN badge on the right */}
 				<header className="flex items-center justify-between gap-4">
 					<Link to="/" className="flex items-center gap-2">
 						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-black text-white shadow-sm shadow-emerald-200">
@@ -164,6 +193,7 @@ function LobbyHost() {
 						</span>
 					</Link>
 
+					{/* Displays the game PIN so the host can share it with players */}
 					<div className="rounded-full bg-linear-to-r from-violet-100 to-fuchsia-100 px-5 py-2 text-sm font-semibold text-emerald-500 shadow-sm shadow-slate-200">
 						Game PIN: {gamePin}
 					</div>
@@ -181,15 +211,18 @@ function LobbyHost() {
 					</div>
 
 					<div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+						{/* Player list section — shows everyone who has joined so far */}
 						<section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.08)]">
 							<div className="flex items-center justify-between px-2 pb-5 pt-1">
 								<h2 className="text-2xl font-bold text-slate-900">Players</h2>
+								{/* Badge showing the number of players currently in the lobby */}
 								<span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-emerald-500">
 									{players.length} joined
 								</span>
 							</div>
 
 							<div className="space-y-3">
+								{/* Render a card for each player; highlight the host's own card */}
 								{players.map((player) => {
 									const isCurrentUser = player.host === true
 
@@ -216,6 +249,7 @@ function LobbyHost() {
 												</div>
 											</div>
 
+											{/* "Host" badge shown next to the host's own entry */}
 											{isCurrentUser ? (
 												<span className="ml-4 shrink-0 rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-white shadow-sm">
 													Host
@@ -227,8 +261,10 @@ function LobbyHost() {
 							</div>
 						</section>
 
+						{/* Right sidebar: decorative "Getting Ready" card and the Start button */}
 						<aside className="flex flex-col items-center">
 							<div className="w-full overflow-hidden rounded-[22px] bg-linear-to-b from-[#d98cff] via-[#bf7bff] to-[#9448ef] shadow-[0_18px_36px_rgba(138,75,255,0.18)]">
+								{/* Decorative illustration area (piano-key shapes) */}
 								<div className="relative h-73 overflow-hidden">
 									<div className="absolute left-1/2 top-10 h-36 w-56 -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
 									<div className="absolute left-1/2 top-16 grid -translate-x-1/2 grid-cols-5 gap-2.5">
@@ -243,6 +279,7 @@ function LobbyHost() {
 									<div className="absolute inset-x-0 bottom-8 mx-auto h-2 w-44 rounded-full bg-white/10 blur-sm" />
 								</div>
 
+								{/* Status text below the illustration */}
 								<div className="bg-[#f7efff] px-4 py-5 text-center">
 									<p className="text-lg font-bold text-emerald-500">
 										Getting Ready
@@ -253,6 +290,7 @@ function LobbyHost() {
 								</div>
 							</div>
 
+							{/* Start button — disabled while the API call is in progress */}
 							<button
 								type="button"
 								onClick={handleStartGame}
@@ -261,6 +299,8 @@ function LobbyHost() {
 							>
 								{isStarting ? 'Starting...' : 'Start'}
 							</button>
+
+							{/* Error message shown if starting the game fails */}
 							{startError ? (
 								<p className="mt-3 max-w-xs text-center text-sm font-medium text-red-500">
 									{startError}
@@ -270,6 +310,7 @@ function LobbyHost() {
 					</div>
 				</main>
 
+				{/* Fixed footer tip and status label */}
 				<footer className="fixed inset-x-0 bottom-5 px-5 sm:px-8 lg:px-10">
 					<div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
 						<div className="max-w-3xl rounded-2xl border border-amber-200 bg-amber-50/80 px-5 py-4 text-sm font-medium text-amber-700 shadow-sm backdrop-blur">

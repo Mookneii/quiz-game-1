@@ -3,6 +3,9 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../api/http'
 import { createStompClient } from '../api/websocket'
 
+// Creates a circular SVG avatar image using the player's initials and a gradient color.
+// 'name' is used to extract initials; 'from' and 'to' are the gradient start/end colors.
+// Returns a data URL string that can be used directly as an <img> src.
 const createAvatar = (name, from, to) => {
 	const initials = name
 		.split(/\s+/)
@@ -32,41 +35,78 @@ const createAvatar = (name, from, to) => {
 
 // removed sidebarPlayers array
 
+// Main component that renders the host's live game screen.
+// Handles real-time updates via WebSocket, shows the current question,
+// tracks how many players have answered, and lets the host advance or end the game.
 function HostLiveGame() {
 	const navigate = useNavigate()
 	const location = useLocation()
 	const params = useParams()
+
+	// Controls whether the "Exit Game" confirmation modal is visible
 	const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+	// Tracks WebSocket connection state: 'connecting' | 'connected' | 'disconnected'
 	const [connectionStatus, setConnectionStatus] = useState('connecting')
+
+	// The current question object received from the server via WebSocket
 	const [liveQuestion, setLiveQuestion] = useState(null)
+
+	// Index (0-based) of the current live question
 	const [liveQuestionIndex, setLiveQuestionIndex] = useState(null)
+
+	// Total number of questions in the quiz
 	const [liveTotalQuestions, setLiveTotalQuestions] = useState(null)
+
+	// True while waiting for the server to respond to a "next question" request
 	const [nextQuestionLoading, setNextQuestionLoading] = useState(false)
 
+	// Resolves the game PIN from URL params or navigation state
 	const gamePin = (() => {
 		const locationState = location.state || {}
 		return params.pin || locationState.pin || locationState.roomCode || '482910'
 	})()
 
+	// List of all players currently in the room (including host)
 	const [players, setPlayers] = useState([])
+
+	// The question currently being displayed
 	const [currentQuestion, setCurrentQuestion] = useState(null)
+
+	// 0-based index of the question currently being displayed
 	const [questionIndex, setQuestionIndex] = useState(0)
+
+	// Total number of questions (used for progress display)
 	const [totalQuestions, setTotalQuestions] = useState(0)
+
+	// Array of player IDs who have already submitted an answer for the current question
 	const [answeredPlayers, setAnsweredPlayers] = useState([])
+
+	// Ref flag to ensure the first question is only requested once after connecting
 	const firstQuestionRequestedRef = useRef(false)
+
+	// Error message shown when a question cannot be loaded
 	const [questionError, setQuestionError] = useState('')
 
+	// Derived values for the answer progress bar
 	const totalPlayers = players.filter(p => !p.host).length
 	const answeredCount = answeredPlayers.length
 	const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
 	
+	// True when the host is on the final question (hides the "Next Question" button)
 	const isLastQuestion = questionIndex != null && totalQuestions != null && questionIndex + 1 >= totalQuestions
+
+	// Percentage of questions completed (used for the top progress bar)
 	const progressPercent = totalQuestions > 0 ? Math.round(((questionIndex + 1) / totalQuestions) * 100) : 0
 
+	// On mount: fetches room/quiz data, opens a WebSocket connection,
+	// subscribes to room events, and automatically requests the first question.
+	// Cleans up the WebSocket connection when the component unmounts.
 	useEffect(() => {
 		let cancelled = false
 		let client
 
+		// Fetches room details and quiz validation, then sets up the WebSocket subscription
 		const initializeRoom = async () => {
 			try {
 				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
@@ -79,8 +119,10 @@ function HostLiveGame() {
 					return
 				}
 
+				// Populate the player sidebar with everyone currently in the room
 				setPlayers(data.players || [])
 
+				// Validate that the linked quiz actually has questions before connecting
 				if (data.quizId) {
 					const quizResponse = await fetch(
 						`http://localhost:8080/api/quizzes/${data.quizId}`
@@ -96,37 +138,46 @@ function HostLiveGame() {
 					}
 				}
 
+				// Create and connect the STOMP WebSocket client
 				client = createStompClient()
 				client.onConnect = () => {
 					setConnectionStatus('connected')
+
+					// Subscribe to the room's topic to receive live game events
 					client.subscribe(`/topic/room/${gamePin}`, (message) => {
 						let event
 						try {
 							event = JSON.parse(message.body)
 						} catch (error) {
+							// Ignore messages that can't be parsed
 							return
 						}
 						console.log('Host WebSocket event received:', event)
 						const payload = event.data ?? event.payload ?? {}
 
 						if (event.type === 'QUESTION_STARTED') {
+							// A new question has started — update the displayed question and reset answered list
 							setCurrentQuestion(payload.question || payload.questionDTO || null)
 							setQuestionIndex(payload.questionIndex ?? 0)
 							setTotalQuestions(payload.totalQuestions ?? 0)
 							setAnsweredPlayers([])
 						} else if (event.type === 'ANSWER_RESULT') {
+							// A player submitted an answer — add them to the answered list (no duplicates)
 							const result = payload
 							setAnsweredPlayers((prev) => {
 								if (prev.includes(result.playerId)) return prev
 								return [...prev, result.playerId]
 							})
 						} else if (event.type === 'LEADERBOARD_UPDATE') {
+							// Scores have been updated — refresh the player list with new scores
 							setPlayers(payload || [])
 						} else if (event.type === 'GAME_FINISHED') {
+							// The game is over — navigate to the leaderboard
 							navigate(`/leaderboard`, { state: { pin: gamePin } })
 						}
 					})
 
+					// Request the first question only once after connecting
 					if (!firstQuestionRequestedRef.current) {
 						firstQuestionRequestedRef.current = true
 						api.post('/api/games/next', {
@@ -141,6 +192,8 @@ function HostLiveGame() {
 						})
 					}
 				}
+
+				// Mark connection as lost if the WebSocket closes unexpectedly
 				client.onWebSocketClose = () => {
 					setConnectionStatus('disconnected')
 				}
@@ -152,12 +205,15 @@ function HostLiveGame() {
 
 		initializeRoom()
 
+		// Cleanup: mark as cancelled and disconnect WebSocket on unmount
 		return () => {
 			cancelled = true
 			client?.deactivate()
 		}
 	}, [gamePin, navigate])
 
+	// Called when the host confirms they want to exit mid-game.
+	// Sends an end-game request to the server and redirects to the host dashboard.
 	const handleConfirmExit = async () => {
 		setIsExitModalOpen(false)
 		try {
@@ -168,6 +224,8 @@ function HostLiveGame() {
 		navigate('/host')
 	}
 
+	// Called when the host clicks the "End" button during the game.
+	// Ends the game on the server and redirects to the leaderboard.
 	const handleEndGame = async () => {
 		try {
 			await api.post('/api/games/end', { roomCode: gamePin })
@@ -177,6 +235,8 @@ function HostLiveGame() {
 		navigate('/leaderboard', { state: { pin: gamePin } })
 	}
 
+	// Called when the host clicks "Next Question".
+	// Posts the next question index to the server so all players receive the new question.
 	const handleNextQuestion = async () => {
 		if (questionIndex == null) {
 			return
@@ -199,6 +259,7 @@ function HostLiveGame() {
 		<div className="min-h-screen bg-[#22c55e] text-slate-900">
 			<div className="mx-auto flex min-h-screen max-w-400 flex-col px-4 py-4 sm:px-6 lg:px-8">
 				<header className="grid grid-cols-3 items-center gap-4">
+					{/* Exit Game button — opens the confirmation modal */}
 					<button
 						type="button"
 						onClick={() => setIsExitModalOpen(true)}
@@ -210,6 +271,7 @@ function HostLiveGame() {
 						Exit Game
 					</button>
 
+					{/* Center: displays the Game PIN so the host can share it */}
 					<div className="flex flex-col items-center justify-center text-center">
 						<span className="mb-1 text-[11px] font-semibold uppercase tracking-[0.35em] text-white/80">
 							Game PIN
@@ -219,6 +281,7 @@ function HostLiveGame() {
 						</div>
 					</div>
 
+					{/* Right: shows avatars of up to 3 players and the total player count */}
 					<div className="flex justify-end">
 						<div className="flex items-center gap-4 rounded-full bg-white/15 px-4 py-2 text-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] backdrop-blur-sm">
 							<div className="flex -space-x-2">
@@ -240,12 +303,14 @@ function HostLiveGame() {
 				</header>
 
 				<main className="mt-4 grid flex-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-5">
+					{/* Left sidebar: scrollable list of all players and their current scores */}
 					<aside className="flex flex-col rounded-[28px] bg-[#f3f4f6] p-4 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
 						<div className="mb-4 flex items-center justify-between px-2 pt-1">
 							<div className="flex items-center gap-2">
 								<span className="text-xl">📊</span>
 								<h2 className="text-2xl font-black text-slate-900">Players</h2>
 							</div>
+							{/* Shows "Live" when the WebSocket is connected, otherwise "Connecting" */}
 							<span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
 								{connectionStatus === 'connected' ? 'Live' : 'Connecting'}
 							</span>
@@ -267,6 +332,7 @@ function HostLiveGame() {
 											{player.nickname || player.name}
 										</p>
 									</div>
+									{/* Player's current score */}
 									<span className="text-sm font-bold text-blue-500">
 										{(player.score || 0).toLocaleString()}
 									</span>
@@ -278,8 +344,11 @@ function HostLiveGame() {
 						</div>
 					</aside>
 
+					{/* Main panel: displays the current question text, answer choices,
+					    a progress bar for how many players answered, and the Next/End buttons */}
 					<section className="flex min-h-155 flex-col rounded-[34px] bg-linear-to-br from-[#f3f4f6] via-[#eef0ff] to-[#cbd5ff] p-8 shadow-[0_18px_42px_rgba(0,0,0,0.14)] lg:p-10">
 						<div className="flex flex-col gap-2">
+							{/* Badge showing question number and connection status dot */}
 							<div className="inline-flex w-fit items-center gap-2 rounded-full bg-violet-200/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-violet-600 shadow-sm">
 								<span
 									className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500' : 'bg-violet-500'}`}
@@ -289,7 +358,7 @@ function HostLiveGame() {
 									: 'Preparing first question...'}
 							</div>
 							
-							{/* Question Progress Bar */}
+							{/* Question Progress Bar — shows how far through the quiz the host is */}
 							{totalQuestions > 0 && (
 								<div className="h-1.5 w-64 overflow-hidden rounded-full bg-slate-200">
 									<div
@@ -300,6 +369,7 @@ function HostLiveGame() {
 							)}
 						</div>
 
+						{/* Question text area — shows error, question text, or a loading placeholder */}
 						<div className="mt-12 max-w-4xl">
 							<h1 className="max-w-4xl text-[clamp(2.8rem,5.6vw,5.5rem)] font-black leading-[0.98] tracking-tight text-slate-900">
 								{questionError ? questionError : currentQuestion ? currentQuestion.questionText : 'Preparing first question...'}
@@ -307,10 +377,12 @@ function HostLiveGame() {
 						</div>
 
 						{questionError ? (
+							// Error state: quiz has no questions or question failed to load
 							<div className="mt-8 rounded-[28px] border border-amber-200 bg-amber-50 px-6 py-8 text-lg font-semibold text-amber-800 shadow-sm">
 								{questionError}
 							</div>
 						) : currentQuestion ? (
+							// Active question: renders the answer choices as read-only cards
 							<div className="mt-8 grid gap-4 sm:grid-cols-2">
 								{currentQuestion.choices?.map((choice, index) => (
 									<div
@@ -322,12 +394,15 @@ function HostLiveGame() {
 								))}
 							</div>
 						) : (
+							// Loading state: waiting for the first question to arrive
 							<div className="mt-8 rounded-[28px] border border-white/60 bg-white/40 px-6 py-8 text-lg font-semibold text-slate-700 shadow-sm backdrop-blur">
 								{nextQuestionLoading ? 'Requesting the first question...' : 'Waiting for the host-triggered question...'}
 							</div>
 						)}
 
+						{/* Bottom row: answer progress bar on the left, Next/End buttons on the right */}
 						<div className="mt-auto flex items-end justify-between gap-4 pb-5 pt-10">
+							{/* Progress bar showing how many players have answered */}
 							<div className="max-w-2xl flex-1">
 								<div className="mb-3 text-lg font-semibold text-slate-800">
 									{answeredCount} <span className="text-slate-600">/{totalPlayers} players answered</span>
@@ -345,6 +420,7 @@ function HostLiveGame() {
 						</div>
 
 						<div className="mt-8 flex items-center justify-between gap-4">
+							{/* Settings button (placeholder — not yet wired up) */}
 							<button
 								type="button"
 								className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/80 text-2xl font-black text-slate-500 shadow-[0_8px_20px_rgba(0,0,0,0.12)]"
@@ -354,6 +430,7 @@ function HostLiveGame() {
 							</button>
 
 							<div className="ml-auto flex items-center gap-4">
+								{/* End button: ends the game immediately and goes to the leaderboard */}
 								<button
 									type="button"
 									onClick={handleEndGame}
@@ -362,6 +439,7 @@ function HostLiveGame() {
 									End
 								</button>
 
+								{/* Next Question button — hidden when the host is on the last question */}
 								{!isLastQuestion && (
 									<button
 										type="button"
@@ -378,6 +456,7 @@ function HostLiveGame() {
 				</main>
 			</div>
 
+			{/* Exit confirmation modal — asks the host to confirm before ending the game for everyone */}
 			{isExitModalOpen ? (
 				<div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
 					<div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)]">
@@ -389,6 +468,7 @@ function HostLiveGame() {
 						</p>
 
 						<div className="mt-6 flex gap-3">
+							{/* Cancel — closes the modal without doing anything */}
 							<button
 								type="button"
 								onClick={() => setIsExitModalOpen(false)}
@@ -396,6 +476,7 @@ function HostLiveGame() {
 							>
 								Cancel
 							</button>
+							{/* Confirm Exit — calls handleConfirmExit to end the game and redirect */}
 							<button
 								type="button"
 								onClick={handleConfirmExit}
