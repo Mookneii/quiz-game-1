@@ -33,35 +33,6 @@ const createAvatar = (name, from, to) => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
-// Mock player list used as placeholder data during development/UI testing.
-// These are not real players — they are replaced by live data from the server.
-const mockPlayers = [
-	{
-		id: 'beun',
-		name: 'Beun',
-		avatar: createAvatar('Beun', '#ff7a59', '#ff4d8d'),
-	},
-	{
-		id: 'plorkjork',
-		name: 'PlorkJork',
-		avatar: createAvatar('PlorkJork', '#46c2ff', '#7c4dff'),
-	},
-	{
-		id: 'jobkok',
-		name: 'JobKok',
-		avatar: createAvatar('JobKok', '#9ca3af', '#475569'),
-	},
-	{
-		id: 'jbarber',
-		name: 'JBarber',
-		avatar: createAvatar('JBarber', '#f59e0b', '#f97316'),
-	},
-	{
-		id: 'goodboy',
-		name: 'GoodBoy',
-		avatar: createAvatar('GoodBoy', '#f8b4d9', '#8b5cf6'),
-	},
-]
 
 // Main component for the host's waiting lobby.
 // Shows all joined players in real time and lets the host start the game
