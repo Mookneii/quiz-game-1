@@ -1,4 +1,9 @@
+// ================================================
+// FULLY FIXED QUIZ BUILDER
+// ================================================
+
 import React, { useRef, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
 import {
   ArrowLeft,
@@ -12,19 +17,31 @@ import {
   Eye,
 } from "lucide-react";
 
+import Sidebar from "../components/Sidebar";
+
+// AI ENDPOINT CONFIGURATION
+const LOCAL_AI_URL = "http://localhost:11434/api/generate";
+
 export default function QuizBuilder() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const coverInputRef = useRef(null);
   const aiFileInputRef = useRef(null);
 
   const [page, setPage] = useState("create");
+  const [isSaving, setIsSaving] =
+    useState(false);
+
+  const editQuiz = location.state?.editQuiz || null;
 
   const [quiz, setQuiz] = useState({
-    title: "",
-    description: "",
+    title: editQuiz?.title || "",
+    description: editQuiz?.description || "",
     cover: null,
   });
 
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState(editQuiz?.questions || []);
+  const [editingQuizId, setEditingQuizId] = useState(editQuiz?.id || null);
 
   const [showAddPanel, setShowAddPanel] =
     useState(false);
@@ -52,15 +69,11 @@ export default function QuizBuilder() {
       difficulty: "easy",
     });
 
-  
+  // ========================================
   // COVER IMAGE
-  
-<<<<<<< Updated upstream
+  // ========================================
 
   const handleCoverUpload = (e) => {
-=======
-    const handleCoverUpload = (e) => {
->>>>>>> Stashed changes
     const file = e.target.files[0];
 
     if (!file) return;
@@ -71,85 +84,67 @@ export default function QuizBuilder() {
     });
   };
 
-<<<<<<< Updated upstream
-  
-  // FAKE AI GENERATE
-  
+  // ========================================
+  // AI GENERATE WITH REAL ENDPOINT
+  // ========================================
 
   const handleAIImport = async (e) => {
-=======
-  // FAKE AI GENERATE
-    
-    const handleAIImport = async (e) => {
->>>>>>> Stashed changes
     const file = e.target.files[0];
 
     if (!file) return;
 
     setIsGeneratingAI(true);
 
-    await new Promise((resolve) =>
-      setTimeout(resolve, 2000)
-    );
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const generatedQuestions = [
-      {
-        question:
-          "Which organ pumps blood throughout the human body?",
-        answers: [
-          "Lungs",
-          "Heart",
-          "Brain",
-          "Kidney",
-        ],
-        correct: 1,
-        difficulty: "easy",
-      },
+      const response = await fetch(LOCAL_AI_URL, {
+        method: method,
+        body: formData,
+      });
 
-      {
-        question:
-          "What is the chemical symbol for gold?",
-        answers: [
-          "Ag",
-          "Au",
-          "Gd",
-          "Go",
-        ],
-        correct: 1,
-        difficulty: "medium",
-      },
+      if (!response.ok) {
+        throw new Error(
+          `AI endpoint error: ${response.status}`
+        );
+      }
 
-      {
-        question:
-          "Which data structure uses FIFO order?",
-        answers: [
-          "Stack",
-          "Queue",
-          "Tree",
-          "Graph",
-        ],
-        correct: 1,
-        difficulty: "hard",
-      },
-    ];
+      const data = await response.json();
+      const generatedQuestions = Array.isArray(data)
+        ? data
+        : data.questions || [];
 
-    setQuestions((prev) => [
-      ...prev,
-      ...generatedQuestions,
-    ]);
+      if (
+        !Array.isArray(generatedQuestions) ||
+        generatedQuestions.length === 0
+      ) {
+        throw new Error(
+          "Invalid response format from AI endpoint"
+        );
+      }
 
-    setIsGeneratingAI(false);
-
-    e.target.value = "";
+      setQuestions((prev) => [
+        ...prev,
+        ...generatedQuestions,
+      ]);
+    } catch (error) {
+      console.error(
+        "Error generating questions:",
+        error
+      );
+      alert(
+        `Failed to generate questions: ${error.message}. Make sure the local AI endpoint is running at ${LOCAL_AI_URL}`
+      );
+    } finally {
+      setIsGeneratingAI(false);
+      e.target.value = "";
+    }
   };
 
-  
+  // ========================================
   // SAVE QUESTION
-<<<<<<< Updated upstream
-  
-=======
- 
->>>>>>> Stashed changes
+  // ========================================
 
   const saveQuestion = () => {
     if (!newQuestion.question.trim()) {
@@ -189,13 +184,9 @@ export default function QuizBuilder() {
     setShowAddPanel(false);
   };
 
-<<<<<<< Updated upstream
- 
-=======
-  
->>>>>>> Stashed changes
+  // ========================================
   // DELETE QUESTION
-  
+  // ========================================
 
   const deleteQuestion = () => {
     const updated = questions.filter(
@@ -207,13 +198,9 @@ export default function QuizBuilder() {
     setDeleteIndex(null);
   };
 
-<<<<<<< Updated upstream
- 
-=======
-  
->>>>>>> Stashed changes
+  // ========================================
   // SAVE EDIT
- 
+  // ========================================
 
   const saveEdit = () => {
     if (!editingQuestion.data.question.trim()) {
@@ -242,37 +229,126 @@ export default function QuizBuilder() {
     setEditingQuestion(null);
   };
 
+  // ========================================
+  // SAVE QUIZ TO API
+  // ========================================
+
+  const saveDone = async () => {
+    if (!quiz.title.trim()) {
+      alert("Please enter a quiz title");
+      return;
+    }
+
+    if (questions.length === 0) {
+      alert("Please add at least one question");
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+      if (!token) {
+        alert("Please login again.");
+        return;
+      }
+
+      const quizData = {
+        title: quiz.title,
+        description: quiz.description,
+        creatorId: user.id,
+        questions: questions.map((q) => ({
+          questionText: q.question,
+          difficulty: q.difficulty,
+          timeLimit: 30,
+          correctChoiceIndex: q.correct,
+          choices: q.answers.map((ans, i) => ({
+            choiceText: ans,
+            isCorrect: i === q.correct,
+          })),
+        })),
+      };
+
+      const url = editingQuizId
+        ? `http://localhost:8080/api/quizzes/${editingQuizId}`
+        : "http://localhost:8080/api/quizzes";
+      const method = editingQuizId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(quizData),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error("Failed to save quiz: " + err);
+      }
+
+      window.dispatchEvent(new Event("quizSaved"));
+      navigate("/host");
+    } catch (error) {
+      console.error("Error saving quiz:", error);
+      alert("Failed to save quiz: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-100">
-      {/* NAVBAR */}
+    <div className="min-h-screen bg-zinc-100 flex flex-col md:flex-row">
+      {/* SIDEBAR */}
+      <Sidebar 
+        activeMenu="create-quiz"
+        isOpen={true}
+        onToggle={() => {}}
+      />
 
-      <div className="h-16 bg-white border-b flex items-center justify-between px-6">
-        <button
-          onClick={() =>
-            page === "create"
-              ? alert("Go Dashboard")
-              : setPage("create")
-          }
-          className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
-        >
-          <ArrowLeft size={20} />
-        </button>
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col">
+        {/* NAVBAR */}
 
-        <h1 className="text-xl font-black text-emerald-500">
-          QuizUp
-        </h1>
+        <div className="h-16 bg-white border-b flex items-center justify-between px-4 md:px-6">
+          <button
+            onClick={() =>
+              page === "create" 
+                ? navigate("/host")
+                : setPage("create")
+            }
+            className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
+          >
+            <ArrowLeft size={20} />
+          </button>
 
-        <div />
-      </div>
+          <button
+            onClick={() => navigate("/host")}
+            className="flex items-center gap-2 hover:opacity-80 transition"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white font-black text-sm">
+              Q
+            </div>
+            <span className="font-bold text-gray-800 text-lg hidden sm:inline">
+              QuizUp
+            </span>
+          </button>
 
-      {/* CREATE PAGE */}
+          <div />
+        </div>
+
+        {/* QUIZ BUILDER CONTENT */}
+        <div className="flex-1 overflow-y-auto">
 
       {page === "create" && (
-        <div className="grid grid-cols-[1fr_320px]">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] min-h-[calc(100vh-64px)]">
           {/* LEFT */}
 
-          <div className="p-10">
-            <h2 className="text-4xl font-black">
+          <div className="p-4 md:p-10">
+            <h2 className="text-2xl md:text-4xl font-black">
               Create Quiz
             </h2>
 
@@ -375,41 +451,112 @@ export default function QuizBuilder() {
 
           {/* LIVE PREVIEW */}
 
-          <div className="bg-white border-l p-6">
-            <div className="text-xs uppercase font-bold text-zinc-400">
+          <div className="bg-white border-l p-4 md:p-6 border-t md:border-t-0 hidden md:flex md:flex-col overflow-hidden">
+            <div className="text-xs uppercase font-bold text-zinc-400 mb-4">
               Live Preview
             </div>
 
-            <div className="mt-4 border rounded-3xl overflow-hidden">
-              <div
-                className={`h-44 bg-cover bg-center ${
-                  !quiz.cover
-                    ? "bg-gradient-to-r from-indigo-500 to-emerald-500"
-                    : ""
-                }`}
-                style={{
-                  backgroundImage: quiz.cover
-                    ? `url(${quiz.cover})`
-                    : "none",
-                }}
-              />
+            <div className="flex flex-col gap-4 overflow-y-auto flex-1">
+              {/* QUIZ CARD */}
+              <div className="border rounded-3xl overflow-hidden flex-shrink-0">
+                <div
+                  className={`h-36 bg-cover bg-center ${
+                    !quiz.cover
+                      ? "bg-gradient-to-r from-indigo-500 to-emerald-500"
+                      : ""
+                  }`}
+                  style={{
+                    backgroundImage: quiz.cover
+                      ? `url(${quiz.cover})`
+                      : "none",
+                  }}
+                />
 
-              <div className="p-5">
-                <h3 className="font-black text-2xl">
-                  {quiz.title || "Quiz Title"}
-                </h3>
+                <div className="p-4">
+                  <h3 className="font-black text-lg">
+                    {quiz.title || "Quiz Title"}
+                  </h3>
 
-                <p className="text-sm text-zinc-500 mt-2">
-                  {quiz.description ||
-                    "Quiz description preview"}
-                </p>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    {quiz.description ||
+                      "Quiz description preview"}
+                  </p>
 
-                <div className="mt-5">
-                  <span className="bg-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
-                    {questions.length} Questions
-                  </span>
+                  <div className="mt-3">
+                    <span className="bg-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
+                      {questions.length} Questions
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* QUESTIONS LIST */}
+              {questions.length > 0 && (
+                <div className="space-y-3">
+                  <div className="text-xs font-bold text-zinc-400 uppercase">
+                    Questions
+                  </div>
+
+                  {questions.map((q, idx) => (
+                    <div
+                      key={idx}
+                      className="border rounded-2xl p-3 bg-zinc-50"
+                    >
+                      <div className="font-bold text-sm mb-2">
+                        {idx + 1}. {q.question}
+                      </div>
+
+                      <div className="mb-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-bold capitalize inline-block ${
+                            q.difficulty === "easy"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : q.difficulty ===
+                                "medium"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {q.difficulty}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        {q.answers.map(
+                          (ans, i) => (
+                            <div
+                              key={i}
+                              className={`text-xs p-2 rounded-lg flex items-center gap-2 ${
+                                q.correct === i
+                                  ? "bg-emerald-100 border border-emerald-300"
+                                  : "bg-white border"
+                              }`}
+                            >
+                              {q.correct ===
+                                i && (
+                                <Check size={14} />
+                              )}
+                              <span
+                                className={
+                                  q.correct ===
+                                  i
+                                    ? "text-emerald-700 font-bold"
+                                    : ""
+                                }
+                              >
+                                {String.fromCharCode(
+                                  65 + i
+                                )}
+                                . {ans}
+                              </span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -418,12 +565,12 @@ export default function QuizBuilder() {
       {/* EDIT PAGE */}
 
       {page === "edit" && (
-        <div className="p-10">
+        <div className="p-4 md:p-10">
           {/* HEADER */}
 
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h2 className="text-4xl font-black">
+              <h2 className="text-2xl md:text-4xl font-black">
                 Edit / Add Questions
               </h2>
 
@@ -432,16 +579,19 @@ export default function QuizBuilder() {
               </p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
               {/* DONE */}
 
               <button
-                onClick={() =>
-                  alert("Go Dashboard")
-                }
-                className="bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold"
+                onClick={saveDone}
+                disabled={isSaving}
+                className={`text-white px-5 py-3 rounded-2xl font-bold flex-1 md:flex-none transition ${
+                  isSaving
+                    ? "bg-blue-300 cursor-not-allowed"
+                    : "bg-blue-500 hover:bg-blue-600"
+                }`}
               >
-                Done
+                {isSaving ? "Saving..." : "Done"}
               </button>
 
               {/* AI */}
@@ -458,7 +608,7 @@ export default function QuizBuilder() {
                 onClick={() =>
                   aiFileInputRef.current.click()
                 }
-                className={`px-5 py-3 rounded-2xl font-bold flex items-center gap-2 text-white ${
+                className={`px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 text-white flex-1 md:flex-none ${
                   isGeneratingAI
                     ? "bg-emerald-300 cursor-not-allowed"
                     : "bg-emerald-500"
@@ -477,7 +627,7 @@ export default function QuizBuilder() {
                 onClick={() =>
                   setShowAddPanel(true)
                 }
-                className="bg-zinc-900 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2"
+                className="bg-zinc-900 text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 flex-1 md:flex-none"
               >
                 <Plus size={18} />
                 Add Question
@@ -733,8 +883,8 @@ export default function QuizBuilder() {
       {/* DELETE MODAL */}
 
       {deleteIndex !== null && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[420px] rounded-3xl p-8">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 md:p-8">
             <h2 className="text-2xl font-black">
               Delete Question
             </h2>
@@ -768,8 +918,8 @@ export default function QuizBuilder() {
       {/* EDIT MODAL */}
 
       {editingQuestion && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[800px] rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full md:w-[800px] rounded-3xl p-6 md:p-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-black">
                 Edit Question
@@ -879,6 +1029,7 @@ export default function QuizBuilder() {
                 ].map((diff) => (
                   <button
                     key={diff}
+
                     onClick={() =>
                       setEditingQuestion({
                         ...editingQuestion,
@@ -921,6 +1072,8 @@ export default function QuizBuilder() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

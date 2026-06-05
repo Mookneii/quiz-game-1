@@ -5,6 +5,9 @@ import React, {
 
 import { useNavigate } from "react-router-dom";
 
+import QuizBuilder from "./Quizbuilder";
+import Sidebar from "../components/Sidebar";
+
 export default function HostDashboard() {
   const navigate = useNavigate();
 
@@ -23,6 +26,18 @@ export default function HostDashboard() {
   // SEARCH
   const [search, setSearch] =
     useState("");
+
+  // SIDEBAR
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
+
+  // VIEW QUIZ STATE
+  const [viewingQuiz, setViewingQuiz] =
+    useState(null);
+
+  // ACTIVE MENU
+  const [activeMenu, setActiveMenu] =
+    useState("my-quizzes");
 
   // TOKEN
   const token =
@@ -103,13 +118,6 @@ export default function HostDashboard() {
     }
   };
 
-  // LOGOUT
-  const handleLogout = () => {
-    localStorage.clear();
-
-    window.location.href = "/";
-  };
-
   // FILTERED QUIZZES
   const filteredQuizzes =
     quizzes.filter((quiz) =>
@@ -119,64 +127,21 @@ export default function HostDashboard() {
     );
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] flex">
+    <div className="min-h-screen bg-[#f5f7fb] flex flex-col md:flex-row">
       {/* SIDEBAR */}
-      <div className="w-[260px] bg-[#eef2f7] border-r flex flex-col justify-between">
-        <div>
-          {/* LOGO */}
-          <div className="px-8 py-8 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold text-lg">
-              ⚡
-            </div>
+      <Sidebar
+        activeMenu={activeMenu}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+      />
 
-            <h1 className="text-3xl font-bold text-gray-800">
-              QuizUp
-            </h1>
-          </div>
-
-          {/* MENU */}
-          <div className="px-3 space-y-2">
-            <button className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-emerald-500 text-white font-semibold shadow-md">
-              📚 My Quizzes
-            </button>
-
-            <button
-              onClick={() =>
-                navigate("/create-quiz")
-              }
-              className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-gray-700 hover:bg-white transition"
-            >
-              ➕ Create Quiz
-            </button>
-
-            <button className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-gray-700 hover:bg-white transition">
-              📈 Reports
-            </button>
-
-            <button className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-gray-700 hover:bg-white transition">
-              ⚙️ Settings
-            </button>
-          </div>
-        </div>
-
-        {/* LOGOUT */}
-        <div className="p-4 border-t">
-          <button
-            onClick={handleLogout}
-            className="text-purple-400 flex items-center gap-3 px-4 py-3 hover:text-red-500 transition"
-          >
-            ↩ Logout
-          </button>
-        </div>
-      </div>
-
-      {/* MAIN */}
-      <div className="flex-1 p-10">
+      {/* MAIN CONTENT */}
+      <div className="flex-1 p-4 md:p-10">
         {/* TOPBAR */}
-        <div className="flex items-center justify-between mb-10">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
           {/* TITLE */}
           <div>
-            <h1 className="text-5xl font-bold text-gray-800">
+            <h1 className="text-3xl sm:text-5xl font-bold text-gray-800">
               My Quizzes
             </h1>
 
@@ -190,7 +155,7 @@ export default function HostDashboard() {
           </div>
 
           {/* RIGHT */}
-          <div className="flex items-center gap-5">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
             {/* SEARCH */}
             <input
               type="text"
@@ -201,15 +166,16 @@ export default function HostDashboard() {
                   e.target.value
                 )
               }
-              className="bg-white px-5 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-emerald-400 w-[260px]"
+              className="bg-white px-4 sm:px-5 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-emerald-400 w-full sm:w-[260px]"
             />
 
             {/* CREATE */}
             <button
-              onClick={() =>
-                navigate("/create-quiz")
-              }
-              className="bg-emerald-500 hover:bg-emerald-600 transition text-white px-6 py-3 rounded-xl font-semibold shadow-md"
+              onClick={() => {
+                setActiveMenu("create-quiz");
+                navigate("/create-quiz");
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 transition text-white px-4 sm:px-6 py-3 rounded-xl font-semibold shadow-md w-full sm:w-auto"
             >
               + Create Quiz
             </button>
@@ -231,13 +197,13 @@ export default function HostDashboard() {
         ) : (
           <>
             {/* QUIZ GRID */}
-            <div className="grid grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {/* QUIZZES */}
               {filteredQuizzes.map(
                 (quiz) => (
                   <div
                     key={quiz.id}
-                    className="bg-white rounded-3xl p-7 border shadow-sm hover:shadow-xl transition"
+                    className="bg-white rounded-3xl p-6 md:p-7 border shadow-sm hover:shadow-xl transition"
                   >
                     {/* TOP */}
                     <div className="flex justify-between items-start mb-6">
@@ -259,8 +225,7 @@ export default function HostDashboard() {
                     <div className="flex flex-col gap-2 text-gray-500 text-sm mb-8">
                       <span>
                         📄{" "}
-                        {quiz.questionsCount ||
-                          0}{" "}
+                        {quiz.questionsCount ?? 0}{" "}
                         Questions
                       </span>
 
@@ -281,9 +246,7 @@ export default function HostDashboard() {
                     <div className="flex gap-3">
                       <button
                         onClick={() =>
-                          navigate(
-                            `/quiz/${quiz.id}`
-                          )
+                          setViewingQuiz(quiz)
                         }
                         className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-semibold transition"
                       >
@@ -307,20 +270,21 @@ export default function HostDashboard() {
 
               {/* CREATE CARD */}
               <button
-                onClick={() =>
-                  navigate("/create-quiz")
-                }
-                className="border-2 border-dashed border-purple-300 rounded-3xl flex flex-col items-center justify-center h-[320px] bg-purple-50/40 hover:bg-purple-100 transition"
+                onClick={() => {
+                  setActiveMenu("create-quiz");
+                  navigate("/create-quiz");
+                }}
+                className="border-2 border-dashed border-purple-300 rounded-3xl flex flex-col items-center justify-center h-[280px] sm:h-[320px] bg-purple-50/40 hover:bg-purple-100 transition"
               >
                 <div className="w-16 h-16 rounded-full bg-white shadow flex items-center justify-center text-4xl text-emerald-500 mb-5">
                   +
                 </div>
 
-                <h3 className="text-2xl font-bold text-gray-400">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-400">
                   Create New Quiz
                 </h3>
 
-                <p className="text-purple-400 mt-2">
+                <p className="text-purple-400 mt-2 text-sm">
                   Start from scratch
                 </p>
               </button>
@@ -329,17 +293,16 @@ export default function HostDashboard() {
             {/* EMPTY */}
             {filteredQuizzes.length ===
               0 && (
-              <div className="text-center py-20">
-                <h2 className="text-3xl font-bold text-gray-700 mb-4">
+              <div className="text-center py-20 col-span-1 sm:col-span-2 lg:col-span-3">
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-4">
                   No quizzes found
                 </h2>
 
                 <button
-                  onClick={() =>
-                    navigate(
-                      "/create-quiz"
-                    )
-                  }
+                  onClick={() => {
+                    setActiveMenu("create-quiz");
+                    navigate("/create-quiz");
+                  }}
                   className="bg-emerald-500 text-white px-6 py-3 rounded-xl"
                 >
                   Create Quiz
@@ -349,6 +312,115 @@ export default function HostDashboard() {
           </>
         )}
       </div>
+
+      {/* VIEW QUIZ MODAL */}
+      {viewingQuiz && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            {/* HEADER */}
+            <div className="sticky top-0 bg-white border-b p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">
+                  {viewingQuiz.title}
+                </h2>
+                <p className="text-gray-500 mt-1">
+                  {viewingQuiz.questionsCount || 0} questions
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingQuiz(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* DESCRIPTION */}
+            {viewingQuiz.description && (
+              <div className="px-6 pt-6 pb-4">
+                <p className="text-gray-600">
+                  {viewingQuiz.description}
+                </p>
+              </div>
+            )}
+
+            {/* QUESTIONS */}
+            <div className="px-6 pb-6 space-y-6">
+              {viewingQuiz.questions && viewingQuiz.questions.length > 0 ? (
+                viewingQuiz.questions.map((question, idx) => (
+                  <div
+                    key={idx}
+                    className="border rounded-2xl p-4 bg-gray-50"
+                  >
+                    {/* QUESTION NUMBER AND TEXT */}
+                    <div className="mb-4">
+                      <div className="text-sm font-bold text-gray-500 mb-2">
+                        Question {idx + 1}
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-800">
+                        {question.question}
+                      </h3>
+                    </div>
+
+                    {/* DIFFICULTY BADGE */}
+                    <div className="mb-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        question.difficulty === "easy"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : question.difficulty === "medium"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-red-100 text-red-700"
+                      }`}>
+                        {question.difficulty}
+                      </span>
+                    </div>
+
+                    {/* ANSWERS */}
+                    <div className="space-y-2">
+                      {question.answers.map((answer, ansIdx) => (
+                        <div
+                          key={ansIdx}
+                          className={`p-3 rounded-lg text-sm font-semibold ${
+                            question.correct === ansIdx
+                              ? "bg-emerald-100 border-2 border-emerald-500 text-emerald-700"
+                              : "bg-white border-2 border-gray-200 text-gray-700"
+                          }`}
+                        >
+                          {String.fromCharCode(65 + ansIdx)}. {answer}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-8">
+                  No questions in this quiz yet
+                </p>
+              )}
+            </div>
+
+            {/* FOOTER */}
+            <div className="border-t bg-gray-50 p-6 flex gap-3 justify-end sticky bottom-0">
+              <button
+                onClick={() => setViewingQuiz(null)}
+                className="px-6 py-3 rounded-xl border font-semibold text-gray-700 hover:bg-gray-100 transition"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setViewingQuiz(null);
+                  setActiveMenu("create-quiz");
+                  navigate("/create-quiz", { state: { editQuiz: viewingQuiz } });
+                }}
+                className="px-6 py-3 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition"
+              >
+                Edit Quiz
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
