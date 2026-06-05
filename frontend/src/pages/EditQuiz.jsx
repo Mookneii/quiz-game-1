@@ -4,7 +4,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { generateQuizFromDocument, createQuiz, getQuiz } from "../api/quiz";
+import { generateQuizFromDocument, createQuiz, getQuiz, updateQuiz } from "../api/quiz";
 
 import {
   ArrowLeft,
@@ -115,12 +115,14 @@ export default function EditQuiz() {
         const generatedQuestions = response.data.questions.map(q => ({
           question: q.questionText || q.text || "",
           answers: [
-            q.choices?.[0] || "",
-            q.choices?.[1] || "",
-            q.choices?.[2] || "",
-            q.choices?.[3] || ""
+            q.choices?.[0]?.choiceText || "",
+            q.choices?.[1]?.choiceText || "",
+            q.choices?.[2]?.choiceText || "",
+            q.choices?.[3]?.choiceText || ""
           ],
-          correct: typeof q.correctChoiceIndex === "number" ? q.correctChoiceIndex : 0,
+          correct: q.choices?.findIndex(c => c.isCorrect === true || c.correct === true) >= 0 
+                   ? q.choices.findIndex(c => c.isCorrect === true || c.correct === true) 
+                   : (typeof q.correctChoiceIndex === "number" ? q.correctChoiceIndex : 0),
           difficulty: q.difficulty?.toLowerCase() || "medium",
         }));
         
@@ -289,17 +291,23 @@ export default function EditQuiz() {
                       return;
                     }
                     
-                    // Actually the createQuiz API just takes SaveQuizRequest
-                    await createQuiz({
+                    const quizData = {
                       id: quizId || null,
                       title: quiz.title || "Untitled Quiz",
                       description: quiz.description || "",
+                      creatorId: user?.id,
                       questions: mappedQuestions
-                    });
+                    };
+
+                    if (quizId) {
+                      await updateQuiz(quizId, quizData);
+                    } else {
+                      await createQuiz(quizData);
+                    }
                     
                     navigate("/host");
                   } catch (err) {
-                    alert("Error saving quiz: " + err.message);
+                    alert("Error saving quiz: " + (err.response?.data?.message || err.message));
                   }
                 }}
                 className="bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold"

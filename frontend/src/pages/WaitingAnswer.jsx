@@ -40,7 +40,7 @@ function WaitingAnswer() {
           const event = JSON.parse(message.body)
           const payload = event.data ?? event.payload ?? {}
 
-          if (event.type === 'ANSWER_RESULT' && payload.playerId === playerId) {
+          if (event.type === 'ANSWER_RESULT' && String(payload.playerId) === String(playerId)) {
             setAnswerResult(payload)
             answerResultRef.current = payload
           }

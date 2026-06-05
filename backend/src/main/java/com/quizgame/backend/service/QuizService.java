@@ -106,6 +106,14 @@ public class QuizService {
         if (request.getDescription() != null) {
             quiz.setDescription(request.getDescription());
         }
+        if (request.getQuestions() != null) {
+            if (quiz.getQuestions() != null) {
+                quiz.getQuestions().clear();
+                quiz.getQuestions().addAll(mapQuestions(request, quiz));
+            } else {
+                quiz.setQuestions(mapQuestions(request, quiz));
+            }
+        }
 
         Quiz savedQuiz = quizRepository.save(quiz);
 
@@ -173,6 +181,13 @@ public class QuizService {
         Integer selectedIndex = questionRequest.getCorrectChoiceIndex();
         if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < choiceRequests.size()) {
             return selectedIndex;
+        }
+
+        // Check if any choice has isCorrect = true
+        for (int i = 0; i < choiceRequests.size(); i++) {
+            if (Boolean.TRUE.equals(choiceRequests.get(i).getIsCorrect())) {
+                return i;
+            }
         }
 
         // Otherwise, attempt to resolve from the AI-provided correctAnswer text on the server.

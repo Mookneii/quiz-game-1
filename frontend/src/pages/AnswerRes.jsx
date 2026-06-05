@@ -8,8 +8,8 @@ const STORAGE_KEY = 'quiz-answer-result';
 const TOTAL_POINTS_KEY = 'quiz-total-points';
 
 const defaultResult = {
-	isCorrect: true,
-	pointsEarned: 10,
+	isCorrect: false,
+	pointsEarned: 0,
 	streak: 0,
 	totalPoints: 0,
 	currentQuestion: 1,

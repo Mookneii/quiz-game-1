@@ -279,8 +279,22 @@ export default function HostDashboard() {
                         📚
                       </div>
 
-                      <button className="text-gray-400 text-xl">
-                        ⋮
+                      <button 
+                        onClick={async () => {
+                          if (window.confirm("Are you sure you want to delete this quiz?")) {
+                            try {
+                              const { deleteQuiz } = await import('../api/quiz');
+                              await deleteQuiz(quiz.id);
+                              fetchQuizzes();
+                            } catch (err) {
+                              alert("Failed to delete quiz");
+                            }
+                          }
+                        }}
+                        className="text-red-400 hover:bg-red-50 p-2 rounded-lg text-xl"
+                        title="Delete Quiz"
+                      >
+                        🗑️
                       </button>
                     </div>
 
