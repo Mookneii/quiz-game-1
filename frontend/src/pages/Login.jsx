@@ -46,6 +46,7 @@ export default function Login() {
       }
 
       const data = await response.json();
+      console.log("LOGIN RESPONSE:", data);
 
       console.log("Login success:", data);
 

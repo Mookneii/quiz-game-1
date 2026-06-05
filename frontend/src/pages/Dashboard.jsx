@@ -160,7 +160,7 @@ export default function HostDashboard() {
           {/* LOGO */}
           <div className="px-8 py-8 flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold text-lg">
-              ⚡
+              Q
             </div>
 
             <h1 className="text-3xl font-bold text-gray-800">
