@@ -7,11 +7,7 @@ import JoinGame from "./pages/JoinGame";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import HostDashboard from "./pages/Dashboard";
-<<<<<<< Updated upstream
-import CreateQUiz from "./pages/CreateQuiz";
-=======
-import CreateQuiz from "./pages/CreateQuiz";
->>>>>>> Stashed changes
+import QuizBuilder from "./pages/Quizbuilder";
 
 export default function App() {
   return (
@@ -25,11 +21,8 @@ export default function App() {
         <Route path="/signup" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<HostDashboard />} />
-<<<<<<< Updated upstream
-        <Route path="/create-quiz" element={<CreateQUiz />} />
-=======
-        <Route path="/create-quiz" element={<CreateQuiz />} />
->>>>>>> Stashed changes
+        <Route path="/host" element={<HostDashboard />} />
+        <Route path="/create-quiz" element={<QuizBuilder />} />
       </Routes>
     </BrowserRouter>
   );
