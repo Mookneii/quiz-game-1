@@ -10,11 +10,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 // Icons used in the result UI
 import {
 	CheckCircle2,
-	Flame,
 	Target,
 	XCircle,
 	Trophy,
-	Zap
 } from 'lucide-react';
 
 // Function that creates a WebSocket/STOMP client connection
@@ -30,7 +28,6 @@ const TOTAL_POINTS_KEY = 'quiz-total-points';
 const defaultResult = {
 	isCorrect: false,
 	pointsEarned: 0,
-	streak: 0,
 	totalPoints: 0,
 	currentQuestion: 1,
 	totalQuestions: 1,
@@ -94,9 +91,6 @@ const AnswerRes = () => {
 		pointsEarned:
 			serverResult.points ?? defaultResult.pointsEarned,
 
-		streak:
-			serverResult.streak ?? defaultResult.streak,
-
 		totalPoints:
 			serverResult.totalScore ?? defaultResult.totalPoints,
 
@@ -116,7 +110,7 @@ const AnswerRes = () => {
 	 * Automatic navigation to next question.
 	 *
 	 * If nextQuestion data already exists in navigation state,
-	 * wait 2 seconds and then redirect to the game page.
+	 * wait and then redirect to the game page.
 	 */
 	useEffect(() => {
 		if (locationState.nextQuestion) {
@@ -145,7 +139,7 @@ const AnswerRes = () => {
 					}
 				});
 
-			}, 2000);
+			}, 5000);
 
 			// Cleanup timer when component unmounts
 			return () => clearTimeout(timer);
@@ -258,9 +252,6 @@ const AnswerRes = () => {
 	const pointsEarned =
 		Number(result.pointsEarned) || 0;
 
-	const streak =
-		Number(result.streak) || 0;
-
 	const totalPoints =
 		Number(result.totalPoints) || 0;
 
@@ -360,8 +351,8 @@ const AnswerRes = () => {
 						</div>
 					</div>
 
-					{/* Statistics cards */}
-					<div className="mt-6 grid gap-4 sm:grid-cols-3">
+					{/* Statistics cards — 2 columns (no streak) */}
+					<div className="mt-6 grid gap-4 sm:grid-cols-2">
 
 						{/* Points earned */}
 						<div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
@@ -371,17 +362,6 @@ const AnswerRes = () => {
 							</div>
 							<div className="text-4xl font-black">
 								+{pointsEarned}
-							</div>
-						</div>
-
-						{/* Current streak */}
-						<div className="rounded-3xl bg-slate-50 p-5 ring-1 ring-slate-200">
-							<div className="mb-6 flex items-center gap-2 text-orange-600 font-semibold uppercase text-xs tracking-[0.2em]">
-								<Flame className="h-4 w-4" />
-								Streak
-							</div>
-							<div className="text-4xl font-black">
-								{streak}
 							</div>
 						</div>
 

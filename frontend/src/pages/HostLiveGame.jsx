@@ -92,7 +92,7 @@ function HostLiveGame() {
 	const totalPlayers = players.filter(p => !p.host).length
 	const answeredCount = answeredPlayers.length
 	const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
-	
+
 	// True when the host is on the final question (hides the "Next Question" button)
 	const isLastQuestion = questionIndex != null && totalQuestions != null && questionIndex + 1 >= totalQuestions
 
@@ -357,7 +357,7 @@ function HostLiveGame() {
 									? `Question ${questionIndex + 1} of ${totalQuestions}`
 									: 'Preparing first question...'}
 							</div>
-							
+
 							{/* Question Progress Bar — shows how far through the quiz the host is */}
 							{totalQuestions > 0 && (
 								<div className="h-1.5 w-64 overflow-hidden rounded-full bg-slate-200">

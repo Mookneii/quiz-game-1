@@ -13,10 +13,14 @@ function WaitingAnswer() {
   // The choice index the player selected (0–3) used for icon display
   const selectedIndex = locationState.selectedIndex ?? null
 
-  // We hold the answer result received from the server until QUESTION_STARTED
-  // fires (or the timer runs out), then we navigate to /results.
-  const answerResultRef = useRef(null)
-  const [answerResult, setAnswerResult] = useState(null)
+  // Primary result source: HTTP response captured in GameRoom before navigating here.
+  // This is always available immediately, with no WebSocket timing dependency.
+  const httpAnswerResult = locationState.answerResult ?? null
+
+  // Seed the ref with the HTTP result so QUESTION_STARTED can use it right away.
+  // WebSocket ANSWER_RESULT updates this only if HTTP result is missing (fallback).
+  const answerResultRef = useRef(httpAnswerResult)
+  const [answerResult, setAnswerResult] = useState(httpAnswerResult)
   const [dots, setDots] = useState(1)
 
   // Animated dots for the waiting text
@@ -40,9 +44,12 @@ function WaitingAnswer() {
           const event = JSON.parse(message.body)
           const payload = event.data ?? event.payload ?? {}
 
-          if (event.type === 'ANSWER_RESULT' && String(payload.playerId) === String(playerId)) {
-            setAnswerResult(payload)
-            answerResultRef.current = payload
+          if (event.type === 'ANSWER_RESULT') {
+            // WebSocket fallback only — use if HTTP result wasn't available
+            if (!answerResultRef.current) {
+              answerResultRef.current = payload
+              setAnswerResult(payload)
+            }
           }
 
           if (event.type === 'QUESTION_STARTED') {

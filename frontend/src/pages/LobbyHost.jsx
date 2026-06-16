@@ -92,7 +92,8 @@ function LobbyHost() {
 
 		loadRoom()
 
-		// Create a STOMP WebSocket client and subscribe to the room topic
+
+		//updating the screen for new player to join into the room
 		const client = createStompClient()
 		client.onConnect = () => {
 			client.subscribe(`/topic/room/${gamePin}`, (message) => {
@@ -126,8 +127,8 @@ function LobbyHost() {
 	const handleStartGame = async () => {
 		setStartError('')
 		setIsStarting(true)
-
 		try {
+			//sending the request to the server to start the game
 			await api.post('/api/games/start', {
 				roomCode: gamePin,
 			})
@@ -200,11 +201,10 @@ function LobbyHost() {
 									return (
 										<div
 											key={player.id}
-											className={`flex items-center justify-between rounded-2xl px-4 py-3 transition ${
-												isCurrentUser
+											className={`flex items-center justify-between rounded-2xl px-4 py-3 transition ${isCurrentUser
 													? 'border border-violet-200 bg-violet-50/70 shadow-[0_8px_20px_rgba(168,85,247,0.08)]'
 													: 'border border-transparent bg-slate-50/80'
-											}`}
+												}`}
 										>
 											<div className="flex min-w-0 items-center gap-4">
 												<img
