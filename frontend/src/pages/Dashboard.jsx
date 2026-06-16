@@ -1,47 +1,36 @@
-import React, {
-  useEffect,
-  useState,
-} from "react";
-
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-import QuizBuilder from "./Quizbuilder";
 import Sidebar from "../components/Sidebar";
 
 export default function HostDashboard() {
   const navigate = useNavigate();
 
   // USER
-  const [user, setUser] =
-    useState(null);
+  const [user, setUser] = useState(null);
 
   // QUIZZES
-  const [quizzes, setQuizzes] =
-    useState([]);
+  const [quizzes, setQuizzes] = useState([]);
 
   // LOADING
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
   // SEARCH
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
   // SIDEBAR
-  const [sidebarOpen, setSidebarOpen] =
-    useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // VIEW QUIZ STATE
-  const [viewingQuiz, setViewingQuiz] =
-    useState(null);
+  const [viewingQuiz, setViewingQuiz] = useState(null);
 
   // ACTIVE MENU
-  const [activeMenu, setActiveMenu] =
-    useState("my-quizzes");
+  const [activeMenu, setActiveMenu] = useState("my-quizzes");
+
+  // ACTIVE DROPDOWN CONTEXT MENU FOR INDIVIDUAL CARD
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
 
   // TOKEN
-  const token =
-    localStorage.getItem("token");
+  const token = localStorage.getItem("token");
 
   // CHECK LOGIN
   useEffect(() => {
@@ -51,14 +40,18 @@ export default function HostDashboard() {
     }
 
     // GET USER
-    const storedUser =
-      localStorage.getItem("user");
+    const storedUser = localStorage.getItem("user");
 
     if (storedUser) {
       setUser(JSON.parse(storedUser));
     }
 
     fetchQuizzes();
+
+    // Listen for custom save event to auto-refresh data if arriving back from Edit page
+    const handleRefresh = () => fetchQuizzes();
+    window.addEventListener("quizSaved", handleRefresh);
+    return () => window.removeEventListener("quizSaved", handleRefresh);
   }, []);
 
   // FETCH QUIZZES
@@ -66,48 +59,34 @@ export default function HostDashboard() {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        "http://localhost:8080/api/quizzes",
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch("http://localhost:8080/api/quizzes", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        throw new Error(
-          "Failed to fetch quizzes"
-        );
+        throw new Error("Failed to fetch quizzes");
       }
 
-      const data =
-        await response.json();
-
-      console.log(
-        "Quiz data:",
-        data
-      );
-
+      const data = await response.json();
+      console.log("Quiz data:", data);
       setQuizzes(data);
     } catch (error) {
-      console.log(error);
+      console.error("Fetch error, loading fallback metrics:", error);
 
       // TEMP DATA IF API FAILS
       setQuizzes([
         {
           id: 1,
-          title:
-            "Modern Physics & Space",
+          title: "Modern Physics & Space",
           questionsCount: 25,
           updatedAt: "2 days ago",
           category: "Science",
         },
-
         {
           id: 2,
-          title:
-            "Future of AI & ML",
+          title: "Future of AI & ML",
           questionsCount: 30,
           updatedAt: "1 week ago",
           category: "Technology",
@@ -119,12 +98,24 @@ export default function HostDashboard() {
   };
 
   // FILTERED QUIZZES
-  const filteredQuizzes =
-    quizzes.filter((quiz) =>
-      quiz.title
-        ?.toLowerCase()
-        .includes(search.toLowerCase())
-    );
+  const filteredQuizzes = quizzes.filter((quiz) =>
+    quiz.title?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  // REUSABLE ROUTING ROUTINE TO FORWARD QUIZ DATA STABLE STATE TO EDIT PAGE
+  const handleNavigateToEdit = (selectedQuiz) => {
+    navigate("/edit-quiz", {
+      state: {
+        quiz: {
+          title: selectedQuiz.title || "",
+          description: selectedQuiz.description || "",
+          cover: selectedQuiz.cover || null,
+        },
+        editingQuizId: selectedQuiz.id || selectedQuiz._id || null,
+        questions: selectedQuiz.questions || [],
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#f5f7fb] flex flex-col md:flex-row">
@@ -148,8 +139,7 @@ export default function HostDashboard() {
             <p className="text-gray-500 mt-2">
               Welcome back{" "}
               <span className="font-semibold text-emerald-500">
-                {user?.fullName ||
-                  "User"}
+                {user?.fullName || "User"}
               </span>
             </p>
           </div>
@@ -161,11 +151,7 @@ export default function HostDashboard() {
               type="text"
               placeholder="Search quizzes..."
               value={search}
-              onChange={(e) =>
-                setSearch(
-                  e.target.value
-                )
-              }
+              onChange={(e) => setSearch(e.target.value)}
               className="bg-white px-4 sm:px-5 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-emerald-400 w-full sm:w-[260px]"
             />
 
@@ -181,10 +167,8 @@ export default function HostDashboard() {
             </button>
 
             {/* USER AVATAR */}
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-yellow-400 flex items-center justify-center text-white font-bold text-lg">
-              {user?.fullName
-                ?.charAt(0)
-                .toUpperCase() || "U"}
+            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-yellow-400 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              {user?.fullName?.charAt(0).toUpperCase() || "U"}
             </div>
           </div>
         </div>
@@ -199,21 +183,42 @@ export default function HostDashboard() {
             {/* QUIZ GRID */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
               {/* QUIZZES */}
-              {filteredQuizzes.map(
-                (quiz) => (
+              {filteredQuizzes.map((quiz) => {
+                const targetId = quiz.id || quiz._id;
+                return (
                   <div
-                    key={quiz.id}
-                    className="bg-white rounded-3xl p-6 md:p-7 border shadow-sm hover:shadow-xl transition"
+                    key={targetId}
+                    className="bg-white rounded-3xl p-6 md:p-7 border shadow-sm hover:shadow-xl transition relative"
                   >
-                    {/* TOP */}
+                    {/* TOP ACCENT LAYOUT */}
                     <div className="flex justify-between items-start mb-6">
                       <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-3xl">
                         📚
                       </div>
 
-                      <button className="text-gray-400 text-xl">
-                        ⋮
-                      </button>
+                      {/* CONTEXT DROPDOWN TRIGGER */}
+                      <div className="relative">
+                        <button 
+                          onClick={() => setActiveDropdownId(activeDropdownId === targetId ? null : targetId)}
+                          className="text-gray-400 text-xl hover:text-gray-600 px-2 py-1 rounded-lg"
+                        >
+                          ⋮
+                        </button>
+                        
+                        {activeDropdownId === targetId && (
+                          <div className="absolute right-0 mt-1 bg-white border shadow-xl rounded-xl py-1 z-10 min-w-[120px]">
+                            <button
+                              onClick={() => {
+                                setActiveDropdownId(null);
+                                handleNavigateToEdit(quiz);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-zinc-100 font-semibold"
+                            >
+                              Edit Details
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* TITLE */}
@@ -224,49 +229,31 @@ export default function HostDashboard() {
                     {/* INFO */}
                     <div className="flex flex-col gap-2 text-gray-500 text-sm mb-8">
                       <span>
-                        📄{" "}
-                        {quiz.questionsCount ?? 0}{" "}
-                        Questions
+                        📄 {quiz.questionsCount ?? (quiz.questions ? quiz.questions.length : 0)} Questions
                       </span>
-
-                      <span>
-                        🏷{" "}
-                        {quiz.category ||
-                          "General"}
-                      </span>
-
-                      <span>
-                        ⏱{" "}
-                        {quiz.updatedAt ||
-                          "Recently"}
-                      </span>
+                      <span>🏷 {quiz.category || "General"}</span>
+                      <span>⏱ {quiz.updatedAt || "Recently"}</span>
                     </div>
 
                     {/* BUTTONS */}
                     <div className="flex gap-3">
                       <button
-                        onClick={() =>
-                          setViewingQuiz(quiz)
-                        }
+                        onClick={() => setViewingQuiz(quiz)}
                         className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-semibold transition"
                       >
                         Open
                       </button>
 
                       <button
-                        onClick={() =>
-                          navigate(
-                            `/host/${quiz.id}`
-                          )
-                        }
+                        onClick={() => navigate(`/host/${targetId}`)}
                         className="flex-1 border border-blue-500 text-blue-500 hover:bg-blue-50 py-3 rounded-xl font-semibold transition"
                       >
                         Host
                       </button>
                     </div>
                   </div>
-                )
-              )}
+                );
+              })}
 
               {/* CREATE CARD */}
               <button
@@ -291,8 +278,7 @@ export default function HostDashboard() {
             </div>
 
             {/* EMPTY */}
-            {filteredQuizzes.length ===
-              0 && (
+            {filteredQuizzes.length === 0 && (
               <div className="text-center py-20 col-span-1 sm:col-span-2 lg:col-span-3">
                 <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-4">
                   No quizzes found
@@ -324,7 +310,7 @@ export default function HostDashboard() {
                   {viewingQuiz.title}
                 </h2>
                 <p className="text-gray-500 mt-1">
-                  {viewingQuiz.questionsCount || 0} questions
+                  {viewingQuiz.questionsCount ?? (viewingQuiz.questions ? viewingQuiz.questions.length : 0)} questions
                 </p>
               </div>
               <button
@@ -338,60 +324,70 @@ export default function HostDashboard() {
             {/* DESCRIPTION */}
             {viewingQuiz.description && (
               <div className="px-6 pt-6 pb-4">
-                <p className="text-gray-600">
-                  {viewingQuiz.description}
-                </p>
+                <p className="text-gray-600">{viewingQuiz.description}</p>
               </div>
             )}
 
             {/* QUESTIONS */}
             <div className="px-6 pb-6 space-y-6">
               {viewingQuiz.questions && viewingQuiz.questions.length > 0 ? (
-                viewingQuiz.questions.map((question, idx) => (
-                  <div
-                    key={idx}
-                    className="border rounded-2xl p-4 bg-gray-50"
-                  >
-                    {/* QUESTION NUMBER AND TEXT */}
-                    <div className="mb-4">
-                      <div className="text-sm font-bold text-gray-500 mb-2">
-                        Question {idx + 1}
+                viewingQuiz.questions.map((question, idx) => {
+                  let standardAnswers = [];
+                  if (Array.isArray(question.answers)) {
+                    standardAnswers = question.answers;
+                  } else if (Array.isArray(question.choices)) {
+                    standardAnswers = question.choices.map(c => c.choiceText || "");
+                  }
+
+                  let correctIdx = 0;
+                  if (question.correctChoiceIndex !== undefined) correctIdx = question.correctChoiceIndex;
+                  else if (question.correct !== undefined) correctIdx = question.correct;
+
+                  return (
+                    <div key={idx} className="border rounded-2xl p-4 bg-gray-50">
+                      {/* QUESTION NUMBER AND TEXT */}
+                      <div className="mb-4">
+                        <div className="text-sm font-bold text-gray-500 mb-2">
+                          Question {idx + 1}
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-800">
+                          {question.questionText || question.question}
+                        </h3>
                       </div>
-                      <h3 className="text-lg font-bold text-gray-800">
-                        {question.question}
-                      </h3>
-                    </div>
 
-                    {/* DIFFICULTY BADGE */}
-                    <div className="mb-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        question.difficulty === "easy"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : question.difficulty === "medium"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                      }`}>
-                        {question.difficulty}
-                      </span>
-                    </div>
-
-                    {/* ANSWERS */}
-                    <div className="space-y-2">
-                      {question.answers.map((answer, ansIdx) => (
-                        <div
-                          key={ansIdx}
-                          className={`p-3 rounded-lg text-sm font-semibold ${
-                            question.correct === ansIdx
-                              ? "bg-emerald-100 border-2 border-emerald-500 text-emerald-700"
-                              : "bg-white border-2 border-gray-200 text-gray-700"
+                      {/* DIFFICULTY BADGE */}
+                      <div className="mb-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${
+                            question.difficulty === "easy"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : question.difficulty === "medium"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
                           }`}
                         >
-                          {String.fromCharCode(65 + ansIdx)}. {answer}
-                        </div>
-                      ))}
+                          {question.difficulty || "easy"}
+                        </span>
+                      </div>
+
+                      {/* ANSWERS */}
+                      <div className="space-y-2">
+                        {standardAnswers.map((answer, ansIdx) => (
+                          <div
+                            key={ansIdx}
+                            className={`p-3 rounded-lg text-sm font-semibold ${
+                              correctIdx === ansIdx
+                                ? "bg-emerald-100 border-2 border-emerald-500 text-emerald-700"
+                                : "bg-white border-2 border-gray-200 text-gray-700"
+                            }`}
+                          >
+                            {String.fromCharCode(65 + ansIdx)}. {answer}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-gray-500 text-center py-8">
                   No questions in this quiz yet
@@ -409,9 +405,9 @@ export default function HostDashboard() {
               </button>
               <button
                 onClick={() => {
+                  const targetQuiz = viewingQuiz;
                   setViewingQuiz(null);
-                  setActiveMenu("create-quiz");
-                  navigate("/create-quiz", { state: { editQuiz: viewingQuiz } });
+                  handleNavigateToEdit(targetQuiz);
                 }}
                 className="px-6 py-3 rounded-xl bg-emerald-500 text-white font-semibold hover:bg-emerald-600 transition"
               >

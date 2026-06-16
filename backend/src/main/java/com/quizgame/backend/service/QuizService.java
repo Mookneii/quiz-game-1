@@ -11,8 +11,8 @@ import com.quizgame.backend.model.User;
 import com.quizgame.backend.repository.QuizRepository;
 import com.quizgame.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // <-- Use Spring's transaction manager
 
-import jakarta.transaction.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +31,7 @@ public class QuizService {
         this.userRepository = userRepository;
     }
 
+    @Transactional // ⚡ CRITICAL FIX: Bundles all nested question/choice inserts into ONE database write operation
     public QuizResponseDTO createQuiz(QuizRequestDTO request) {
         if (request.getCreatorId() == null) {
             throw new RuntimeException("CreatorId is required");
@@ -52,7 +53,7 @@ public class QuizService {
     @Transactional
     public List<QuizResponseDTO> getAllQuizzes() {
         List<Quiz> quizzes = quizRepository.findAll();
-        Collections.reverse(quizzes); // newest first
+        Collections.reverse(quizzes); 
         return quizzes.stream().map(this::toDTO).collect(Collectors.toList());
     }
 
@@ -63,6 +64,7 @@ public class QuizService {
         return toDTO(quiz);
     }
 
+    @Transactional // ⚡ CRITICAL FIX: Clears old data and saves new sets inside a single, fast transaction block
     public QuizResponseDTO updateQuiz(Long id, QuizRequestDTO request) {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
@@ -70,10 +72,11 @@ public class QuizService {
         if (request.getTitle() != null) quiz.setTitle(request.getTitle());
         if (request.getDescription() != null) quiz.setDescription(request.getDescription());
 
-        // Replace all questions
+        // Replace all questions safely
         if (request.getQuestions() != null) {
             quiz.getQuestions().clear();
-            quizRepository.save(quiz); // flush deletes first
+            
+            // Avoid intermediate flushes if possible; clear paired with orphaning handles cleanup on commit.
             List<Question> newQuestions = mapQuestions(request, quiz);
             quiz.getQuestions().addAll(newQuestions);
         }
@@ -81,6 +84,7 @@ public class QuizService {
         return toDTO(quizRepository.save(quiz));
     }
 
+    @Transactional // Good practice to wrap deletes too
     public void deleteQuiz(Long id) {
         quizRepository.deleteById(id);
     }
@@ -105,7 +109,6 @@ public class QuizService {
                             .collect(Collectors.toList());
                     dto.setAnswers(answers);
 
-                    // find index of correct choice
                     int correctIdx = IntStream.range(0, choices.size())
                             .filter(i -> Boolean.TRUE.equals(choices.get(i).getIsCorrect()))
                             .findFirst()

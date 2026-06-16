@@ -9,11 +9,6 @@ export default function Sidebar({
 }) {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.clear();
-    window.location.href = "/";
-  };
-
   const menuItems = [
     {
       key: "my-quizzes",
@@ -43,21 +38,22 @@ export default function Sidebar({
         <div className="w-8" />
       </div>
 
-      {/* SIDEBAR */}
+      {/* SIDEBAR CONTAINER */}
       <div
-        className={`fixed md:relative inset-0 z-40 md:z-auto bg-white md:bg-[#eef2f7] border-r flex flex-col justify-between w-full md:w-[260px] transition-all duration-300 ${
+        className={`fixed md:relative inset-0 z-40 md:z-auto bg-white md:bg-[#eef2f7] border-r flex flex-col w-full md:w-[260px] transition-all duration-300 ${
           isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
         }`}
       >
         <div>
-          {/* LOGO - now green */}
+          {/* LOGO ZONE */}
           <div className="px-8 py-8 flex items-center gap-3">
             <button
               onClick={() => navigate("/host")}
               className="flex items-center gap-3 hover:opacity-80 transition"
             >
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-bold text-lg">
-                ⚡
+              {/* GREEN BOX WITH WHITE 'Q' TO MATCH THE TOP PANEL IN image_eb8ee4.png */}
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-black text-xl tracking-tighter select-none">
+                Q
               </div>
               <h1 className="text-3xl font-bold text-gray-800 hidden md:block">
                 QuizUp
@@ -65,7 +61,7 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* MENU */}
+          {/* MENU ITEMS */}
           <div className="px-3 space-y-2">
             {menuItems.map((item) => (
               <button
@@ -84,16 +80,6 @@ export default function Sidebar({
               </button>
             ))}
           </div>
-        </div>
-
-        {/* LOGOUT */}
-        <div className="p-4 border-t">
-          <button
-            onClick={handleLogout}
-            className="text-gray-400 flex items-center gap-3 px-4 py-3 hover:text-red-500 transition w-full"
-          >
-            ↩ Logout
-          </button>
         </div>
       </div>
 
