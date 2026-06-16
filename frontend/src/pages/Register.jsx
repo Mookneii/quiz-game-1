@@ -35,7 +35,7 @@ export default function Register() {
 
       // BACKEND API
       const response = await fetch(
-        "http://localhost:8080/api/auth/register",
+        `http://${window.location.hostname}:8080/api/auth/register`,
         {
           method: "POST",
           headers: {

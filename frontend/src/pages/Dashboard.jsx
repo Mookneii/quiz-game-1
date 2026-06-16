@@ -52,7 +52,7 @@ export default function HostDashboard() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:8080/api/quizzes",
+        `http://${window.location.hostname}:8080/api/quizzes`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -113,7 +113,7 @@ export default function HostDashboard() {
   // HOST ROOM
   const handleHostRoom = async (quizId) => {
     try {
-      const response = await fetch("http://localhost:8080/api/rooms", {
+      const response = await fetch(`http://${window.location.hostname}:8080/api/rooms`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

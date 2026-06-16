@@ -25,7 +25,7 @@ export default function JoinGame() {
 
       // API CALL
       const response = await fetch(
-        "http://localhost:8080/api/rooms/join",
+        `http://${window.location.hostname}:8080/api/rooms/join`,
         {
           method: "POST",
           headers: {
