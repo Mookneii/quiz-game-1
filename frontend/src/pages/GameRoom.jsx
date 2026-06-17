@@ -3,6 +3,14 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { createStompClient } from '../api/websocket'
 import api from '../api/http'
 
+/**
+ * UI configuration for the 4 answer choices.
+ * Each choice has:
+ * - color styling
+ * - hover/active effects
+ * - shape icon
+ * - label (A, B, C, D)
+ */
 const SHAPES = [
   { bg: 'bg-red-500',    hover: 'hover:bg-red-600',    active: 'bg-red-700',    shape: '▲', label: 'A' },
   { bg: 'bg-blue-500',   hover: 'hover:bg-blue-600',   active: 'bg-blue-700',   shape: '♦', label: 'B' },
@@ -11,66 +19,118 @@ const SHAPES = [
 ]
 
 function GameRoom() {
+
+  // ─────────────────────────────────────────────────────────────
+  // Router hooks
+  // ─────────────────────────────────────────────────────────────
   const location = useLocation()
   const navigate = useNavigate()
   const params = useParams()
+
+  // Data passed from previous screen (join page / waiting page)
   const locationState = location.state || {}
 
-  const gamePin    = params.pin || locationState.pin || '123456'
-  const playerId   = locationState.playerId
-  const nickname   = locationState.nickname || 'Player'
+  // Game identification
+  const gamePin  = params.pin || locationState.pin || '123456'
+  const playerId = locationState.playerId
+  const nickname = locationState.nickname || 'Player'
 
-  // ─── Question state ────────────────────────────────────────────────────────
-  // question comes in via location.state on the first render, and via WebSocket
-  // for every subsequent question. We initialise directly so it displays immediately.
-  const [question,       setQuestion]       = useState(locationState.question || null)
-  const [questionIndex,  setQuestionIndex]  = useState(locationState.questionIndex  ?? null)
-  const [totalQuestions, setTotalQuestions] = useState(locationState.totalQuestions ?? null)
+  // ─────────────────────────────────────────────────────────────
+  // QUESTION STATE
+  // ─────────────────────────────────────────────────────────────
 
-  // ─── Timer ────────────────────────────────────────────────────────────────
-  // timeLeft is initialised from the question's timeLimit the moment we have one.
+  /**
+   * Current question data displayed on screen.
+   * Initially comes from navigation state,
+   * later updated via WebSocket events.
+   */
+  const [question, setQuestion] = useState(
+    locationState.question || null
+  )
+
+  // Index of current question (Q1, Q2, etc.)
+  const [questionIndex, setQuestionIndex] = useState(
+    locationState.questionIndex ?? null
+  )
+
+  // Total number of questions in the game
+  const [totalQuestions, setTotalQuestions] = useState(
+    locationState.totalQuestions ?? null
+  )
+
+  // ─────────────────────────────────────────────────────────────
+  // TIMER STATE
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Countdown timer for current question.
+   * Initialized from backend question timeLimit.
+   */
   const [timeLeft, setTimeLeft] = useState(
     locationState.question?.timeLimit ?? null
   )
+
+  // Whether time has expired
   const [isTimeUp, setIsTimeUp] = useState(false)
 
-  // Track when this question started so we can calculate timeTakenMs
+  // Used to calculate response time (ms)
   const startTimeRef = useRef(Date.now())
 
-  // ─── Answer state ─────────────────────────────────────────────────────────
-  const [selectedIndex, setSelectedIndex] = useState(null) // index 0-3
+  // ─────────────────────────────────────────────────────────────
+  // ANSWER STATE
+  // ─────────────────────────────────────────────────────────────
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // WebSocket — subscribe once per gamePin
-  // ─────────────────────────────────────────────────────────────────────────
+  // Index of selected answer (0–3)
+  const [selectedIndex, setSelectedIndex] = useState(null)
+
+  // ─────────────────────────────────────────────────────────────
+  // WEBSOCKET CONNECTION (REAL-TIME GAME UPDATES)
+  // ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
+
+    // Do not connect if no game exists
     if (!gamePin) return
 
     const client = createStompClient()
 
     client.onConnect = () => {
+
+      // Subscribe to this game room channel
       client.subscribe(`/topic/room/${gamePin}`, (message) => {
+
         try {
-          const event   = JSON.parse(message.body)
+          const event = JSON.parse(message.body)
+
+          // Safe fallback for payload structure
           const payload = event.data ?? event.payload ?? {}
 
+          // ─────────────────────────────────────────────
+          // NEW QUESTION STARTED
+          // ─────────────────────────────────────────────
           if (event.type === 'QUESTION_STARTED') {
-            // A new question started (this happens when host clicks Next while
-            // the player is still on THIS screen — i.e. they haven't answered yet).
-            // Reset everything and show the new question.
+
             const newQ = payload.question || payload.questionDTO || null
+
+            // Reset UI for new question
             setQuestion(newQ)
-            setQuestionIndex(payload.questionIndex  ?? null)
+            setQuestionIndex(payload.questionIndex ?? null)
             setTotalQuestions(payload.totalQuestions ?? null)
             setSelectedIndex(null)
             setIsTimeUp(false)
             setTimeLeft(newQ?.timeLimit ?? null)
+
+            // Reset timer reference
             startTimeRef.current = Date.now()
           }
 
+          // ─────────────────────────────────────────────
+          // GAME FINISHED
+          // ─────────────────────────────────────────────
           if (event.type === 'GAME_FINISHED') {
             navigate('/leaderboard', { state: { pin: gamePin } })
           }
+
         } catch (err) {
           console.error('GameRoom WS error:', err)
         }
@@ -78,57 +138,82 @@ function GameRoom() {
     }
 
     client.activate()
+
+    // Cleanup connection on unmount
     return () => client.deactivate()
+
   }, [gamePin, navigate])
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Timer countdown — starts whenever timeLeft is a non-null positive number
-  // and the player hasn't answered yet.
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // TIMER LOGIC (COUNTDOWN)
+  // ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
+
+    // Stop timer if invalid state or already answered
     if (timeLeft === null || isTimeUp || selectedIndex !== null) return
 
+    // If time runs out → auto submit
     if (timeLeft <= 0) {
       setIsTimeUp(true)
       handleAutoSubmit()
       return
     }
 
-    const id = setInterval(() => setTimeLeft((prev) => prev - 1), 1000)
+    // Countdown every 1 second
+    const id = setInterval(() => {
+      setTimeLeft(prev => prev - 1)
+    }, 1000)
+
     return () => clearInterval(id)
+
   }, [timeLeft, isTimeUp, selectedIndex])
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Auto-submit when time runs out (no answer selected)
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // AUTO-SUBMIT (WHEN TIME RUNS OUT)
+  // ─────────────────────────────────────────────────────────────
+
   const handleAutoSubmit = async () => {
+
+    // Prevent duplicate submission
     if (!question || selectedIndex !== null) return
+
     try {
       await api.post('/api/games/answer', {
-        roomCode:    gamePin,
+        roomCode: gamePin,
         playerId,
-        questionId:  question.id,
-        choiceId:    -1,
+        questionId: question.id,
+        choiceId: -1, // -1 = no answer selected
         timeTakenMs: (question.timeLimit || 0) * 1000,
       })
     } catch (err) {
       console.error('Auto-submit error:', err)
     }
-    // After auto-submit → navigate to WaitingAnswer so the player still sees
-    // the waiting screen and receives AnswerRes when host clicks Next.
+
+    // Navigate to waiting screen
     navigate('/waiting', {
       replace: true,
-      state: { pin: gamePin, playerId, nickname, selectedIndex: null },
+      state: {
+        pin: gamePin,
+        playerId,
+        nickname,
+        selectedIndex: null,
+      },
     })
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Player picks a choice
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // USER SELECTS AN ANSWER
+  // ─────────────────────────────────────────────────────────────
+
   const handleChoice = async (choiceId, index) => {
+
+    // Prevent multiple clicks or answering after timeout
     if (selectedIndex !== null || isTimeUp) return
+
     setSelectedIndex(index)
 
+    // Calculate response time
     const timeTakenMs = Date.now() - startTimeRef.current
 
     try {
@@ -139,23 +224,33 @@ function GameRoom() {
         choiceId,
         timeTakenMs,
       })
-      // ✅ Navigate immediately to the Kahoot-style waiting screen
+
+      // Go to waiting screen after submitting answer
       navigate('/waiting', {
         replace: true,
-        state: { pin: gamePin, playerId, nickname, selectedIndex: index },
+        state: {
+          pin: gamePin,
+          playerId,
+          nickname,
+          selectedIndex: index,
+        },
       })
+
     } catch (err) {
       console.error('Answer submit error:', err)
-      setSelectedIndex(null) // revert on failure
+
+      // Reset selection if request fails
+      setSelectedIndex(null)
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Derived
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // DERIVED VALUES (SAFE FALLBACKS)
+  // ─────────────────────────────────────────────────────────────
+
   const choices = question?.choices || []
 
-  // Timer colour: green → yellow → red as time shrinks
+  // Timer color changes based on remaining time
   const timerColor =
     timeLeft === null
       ? 'bg-slate-700'
@@ -165,96 +260,89 @@ function GameRoom() {
       ? 'bg-yellow-500'
       : 'bg-red-500'
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // UI RENDER
+  // ─────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+
+      {/* HEADER */}
       <header className="flex items-center justify-between px-6 py-4 bg-slate-800 shadow-lg">
-        <div className="font-extrabold text-xl text-emerald-400">QuizUp</div>
+
+        <div className="font-extrabold text-xl text-emerald-400">
+          QuizUp
+        </div>
+
         <div className="flex gap-3 items-center">
+
           {/* Question counter */}
           {questionIndex !== null && totalQuestions !== null && (
             <div className="bg-white/10 rounded-full px-4 py-1.5 text-xs font-bold text-white/70 uppercase tracking-widest">
               Q {questionIndex + 1} / {totalQuestions}
             </div>
           )}
+
+          {/* Game PIN */}
           <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
             PIN: {gamePin}
           </div>
+
+          {/* Player name */}
           <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-4 py-2 text-sm font-bold text-emerald-400">
             {nickname}
           </div>
+
         </div>
       </header>
 
-      {/* ── Main ───────────────────────────────────────────────────────── */}
+      {/* MAIN GAME AREA */}
       <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8 w-full max-w-5xl mx-auto">
 
+        {/* If no question yet → waiting screen */}
         {!question ? (
-          /* No question yet */
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="h-16 w-16 rounded-full border-4 border-emerald-400 border-t-transparent animate-spin" />
-            <p className="text-2xl font-black text-white/60">Waiting for next question...</p>
+            <p className="text-2xl font-black text-white/60">
+              Waiting for next question...
+            </p>
           </div>
         ) : (
           <>
-            {/* ── Question + Timer row ─────────────────────────────────── */}
+            {/* QUESTION + TIMER */}
             <div className="w-full flex items-start justify-between gap-6">
-              {/* Question text */}
-              <div className="flex-1">
-                <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
-                  {question.questionText}
-                </h1>
-              </div>
 
-              {/* Timer circle */}
+              <h1 className="flex-1 text-3xl sm:text-4xl font-black text-white leading-tight">
+                {question.questionText}
+              </h1>
+
+              {/* Countdown timer */}
               {timeLeft !== null && (
-                <div
-                  className={`
-                    shrink-0 flex items-center justify-center
-                    h-20 w-20 rounded-full text-white text-4xl font-black
-                    shadow-xl transition-colors duration-500
-                    ${timerColor}
-                  `}
-                >
+                <div className={`h-20 w-20 rounded-full flex items-center justify-center text-white text-4xl font-black ${timerColor}`}>
                   {timeLeft}
                 </div>
               )}
+
             </div>
 
-            {/* ── Choices grid ─────────────────────────────────────────── */}
-            <div className="w-full grid grid-cols-2 gap-4" style={{ minHeight: '320px' }}>
+            {/* ANSWER OPTIONS */}
+            <div className="w-full grid grid-cols-2 gap-4">
+
               {choices.map((c, i) => {
                 const s = SHAPES[i % 4]
+
                 return (
                   <button
                     key={c.id || i}
                     onClick={() => handleChoice(c.id, i)}
                     disabled={selectedIndex !== null || isTimeUp}
-                    className={`
-                      relative overflow-hidden rounded-2xl flex items-center justify-center
-                      shadow-lg transition-all duration-150 active:scale-95
-                      disabled:opacity-60 disabled:cursor-not-allowed
-                      ${s.bg} ${s.hover}
-                    `}
+                    className={`${s.bg} ${s.hover} rounded-2xl flex items-center justify-center text-white font-bold text-2xl p-6`}
                   >
-                    {/* Background shape watermark */}
-                    <span className="text-white opacity-15 text-[9rem] absolute pointer-events-none select-none">
-                      {s.shape}
-                    </span>
-                    {/* Option label pill */}
-                    <span className="absolute top-3 left-3 bg-black/20 rounded-full w-8 h-8 flex items-center justify-center text-white font-black text-sm">
-                      {s.label}
-                    </span>
-                    {/* Choice text */}
-                    <span className="text-white text-2xl font-bold z-10 px-8 text-center break-words leading-snug">
-                      {c.choiceText}
-                    </span>
+                    <span>{c.choiceText}</span>
                   </button>
                 )
               })}
+
             </div>
           </>
         )}
