@@ -5,7 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
+import java.util.ArrayList;
 @Entity
 @Getter
 @Setter
@@ -28,6 +28,10 @@ public class Quiz {
     @JoinColumn(name = "creator_id")
     private User creator;
 
-    @OneToMany(mappedBy = "quiz", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Question> questions;
+    @OneToMany(
+        mappedBy = "quiz",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
+    )
+    private List<Question> questions = new ArrayList<>();
 }

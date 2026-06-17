@@ -8,6 +8,9 @@ import com.quizgame.backend.dto.RoomCodeRequest;
 import com.quizgame.backend.dto.SubmitAnswerRequest;
 import com.quizgame.backend.service.GameService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import com.quizgame.backend.service.JwtService;
 
 import java.util.List;
 
@@ -17,19 +20,48 @@ import java.util.List;
 public class GameController {
 
     private final GameService gameService;
+    private final JwtService jwtService;
 
-    public GameController(GameService gameService) {
+    public GameController(
+            GameService gameService,
+            JwtService jwtService) {
+
         this.gameService = gameService;
+        this.jwtService = jwtService;
     }
 
     @PostMapping("/start")
-    public void startGame(@RequestBody RoomCodeRequest request) {
+    public void startGame(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody RoomCodeRequest request) {
+
+        String token = authHeader.substring(7);
+
+        if (!jwtService.isTokenValid(token)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Token expired or invalid");
+        }
+
         gameService.startGame(request.getRoomCode());
     }
 
     @PostMapping("/next")
-    public QuestionDTO nextQuestion(@RequestBody NextQuestionRequest request) {
-        return gameService.nextQuestion(request.getRoomCode(), request.getQuestionIndex());
+    public QuestionDTO nextQuestion(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody NextQuestionRequest request) {
+
+        String token = authHeader.substring(7);
+
+        if (!jwtService.isTokenValid(token)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Token expired or invalid");
+        }
+
+        return gameService.nextQuestion(
+                request.getRoomCode(),
+                request.getQuestionIndex());
     }
 
     @PostMapping("/answer")
@@ -38,7 +70,18 @@ public class GameController {
     }
 
     @PostMapping("/end")
-    public void endGame(@RequestBody RoomCodeRequest request) {
+    public void endGame(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody RoomCodeRequest request) {
+
+        String token = authHeader.substring(7);
+
+        if (!jwtService.isTokenValid(token)) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Token expired or invalid");
+        }
+
         gameService.endGame(request.getRoomCode());
     }
 
