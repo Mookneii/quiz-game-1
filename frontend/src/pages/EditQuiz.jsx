@@ -469,136 +469,111 @@ export default function EditQuiz() {
               </div>
             ))}
 
-            {/* ADD PANEL */}
 
-            {showAddPanel && (
-              <div className="bg-white border-2 border-dashed rounded-3xl p-6">
-                <input
-                  className="w-full border rounded-2xl px-4 py-3"
-                  placeholder="Input question..."
-                  value={newQuestion.question}
-                  onChange={(e) =>
-                    setNewQuestion({
-                      ...newQuestion,
-                      question:
-                        e.target.value,
-                    })
-                  }
-                />
-
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  {newQuestion.answers.map(
-                    (a, i) => (
-                      <input
-                        key={i}
-                        className="border rounded-2xl px-4 py-3"
-                        placeholder={`Answer ${
-                          i + 1
-                        }`}
-                        value={a}
-                        onChange={(e) => {
-                          const updated = [
-                            ...newQuestion.answers,
-                          ];
-
-                          updated[i] =
-                            e.target.value;
-
-                          setNewQuestion({
-                            ...newQuestion,
-                            answers: updated,
-                          });
-                        }}
-                      />
-                    )
-                  )}
-                </div>
-
-                <div className="mt-6">
-                  <div className="font-bold text-sm mb-2">
-                    Pick Correct Answer
-                  </div>
-
-                  <div className="flex gap-2">
-                    {[0, 1, 2, 3].map(
-                      (i) => (
-                        <button
-                          key={i}
-                          onClick={() =>
-                            setNewQuestion({
-                              ...newQuestion,
-                              correct: i,
-                            })
-                          }
-                          className={`w-12 h-12 rounded-2xl border font-black ${
-                            newQuestion.correct ===
-                            i
-                              ? "bg-emerald-500 text-white"
-                              : ""
-                          }`}
-                        >
-                          {String.fromCharCode(
-                            65 + i
-                          )}
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <div className="font-bold text-sm mb-2">
-                    Difficulty
-                  </div>
-
-                  <div className="flex gap-2">
-                    {[
-                      "easy",
-                      "medium",
-                      "hard",
-                    ].map((diff) => (
-                      <button
-                        key={diff}
-                        onClick={() =>
-                          setNewQuestion({
-                            ...newQuestion,
-                            difficulty: diff,
-                          })
-                        }
-                        className={`px-4 py-2 rounded-xl font-bold capitalize ${
-                          newQuestion.difficulty ===
-                          diff
-                            ? "bg-emerald-500 text-white"
-                            : "bg-zinc-100"
-                        }`}
-                      >
-                        {diff}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-8">
-                  <button
-                    onClick={() =>
-                      setShowAddPanel(false)
-                    }
-                    className="border px-5 py-3 rounded-2xl font-bold"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={saveQuestion}
-                    className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
-                  >
-                    Save Question
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
+
+      {/* ADD QUESTION MODAL */}
+
+      {showAddPanel && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white w-[800px] rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center">
+              <h2 className="text-3xl font-black">Add Question</h2>
+              <button
+                onClick={() => setShowAddPanel(false)}
+                className="border px-4 py-2 rounded-2xl font-bold"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <input
+                className="w-full border rounded-2xl px-4 py-3"
+                placeholder="Input question..."
+                value={newQuestion.question}
+                onChange={(e) =>
+                  setNewQuestion({ ...newQuestion, question: e.target.value })
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              {newQuestion.answers.map((a, i) => (
+                <input
+                  key={i}
+                  className="border rounded-2xl px-4 py-3"
+                  placeholder={`Answer ${i + 1}`}
+                  value={a}
+                  onChange={(e) => {
+                    const updated = [...newQuestion.answers];
+                    updated[i] = e.target.value;
+                    setNewQuestion({ ...newQuestion, answers: updated });
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="mt-6">
+              <div className="font-bold text-sm mb-2">Pick Correct Answer</div>
+              <div className="flex gap-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <button
+                    key={i}
+                    onClick={() =>
+                      setNewQuestion({ ...newQuestion, correct: i })
+                    }
+                    className={`w-12 h-12 rounded-2xl border font-black ${
+                      newQuestion.correct === i
+                        ? "bg-emerald-500 text-white"
+                        : ""
+                    }`}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="font-bold text-sm mb-2">Difficulty</div>
+              <div className="flex gap-2">
+                {["easy", "medium", "hard"].map((diff) => (
+                  <button
+                    key={diff}
+                    onClick={() =>
+                      setNewQuestion({ ...newQuestion, difficulty: diff })
+                    }
+                    className={`px-4 py-2 rounded-xl font-bold capitalize ${
+                      newQuestion.difficulty === diff
+                        ? "bg-emerald-500 text-white"
+                        : "bg-zinc-100"
+                    }`}
+                  >
+                    {diff}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-10">
+              <button
+                onClick={() => setShowAddPanel(false)}
+                className="border px-5 py-3 rounded-2xl font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveQuestion}
+                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
+              >
+                Save Question
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DELETE MODAL */}
 

@@ -178,19 +178,21 @@ function GameRoom() {
     // Prevent duplicate submission
     if (!question || selectedIndex !== null) return
 
+    let answerResult = null
     try {
-      await api.post('/api/games/answer', {
+      const res = await api.post('/api/games/answer', {
         roomCode: gamePin,
         playerId,
         questionId: question.id,
         choiceId: -1, // -1 = no answer selected
         timeTakenMs: (question.timeLimit || 0) * 1000,
       })
+      answerResult = res.data ?? null
     } catch (err) {
       console.error('Auto-submit error:', err)
     }
 
-    // Navigate to waiting screen
+    // Navigate to waiting screen, carrying the result
     navigate('/waiting', {
       replace: true,
       state: {
@@ -198,6 +200,7 @@ function GameRoom() {
         playerId,
         nickname,
         selectedIndex: null,
+        answerResult,
       },
     })
   }
@@ -217,7 +220,11 @@ function GameRoom() {
     const timeTakenMs = Date.now() - startTimeRef.current
 
     try {
-      await api.post('/api/games/answer', {
+      // Capture the HTTP response — the backend already returns AnswerResultDTO
+      // (correct, points, totalScore) as the HTTP response body, so we don't
+      // need to rely on the WebSocket ANSWER_RESULT which always fires before
+      // WaitingAnswer has a chance to subscribe.
+      const res = await api.post('/api/games/answer', {
         roomCode: gamePin,
         playerId,
         questionId: question.id,
@@ -225,7 +232,7 @@ function GameRoom() {
         timeTakenMs,
       })
 
-      // Go to waiting screen after submitting answer
+      // Go to waiting screen, carrying the result so /results can show it
       navigate('/waiting', {
         replace: true,
         state: {
@@ -233,6 +240,7 @@ function GameRoom() {
           playerId,
           nickname,
           selectedIndex: index,
+          answerResult: res.data ?? null,
         },
       })
 

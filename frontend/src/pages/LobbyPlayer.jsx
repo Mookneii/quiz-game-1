@@ -57,9 +57,12 @@ function LobbyPlayer() {
 		locationState.roomCode ||
 		'123456'
 
+	// Real numeric player ID from the join API response
+	const realPlayerId = locationState.playerId ?? null
+
 	// Build the current player's info from navigation state
 	const currentUser = {
-		id: locationState.playerId || 'current-user',
+		id: realPlayerId ?? 'current-user',
 		name: locationState.nickname || 'Berk',
 		avatar: createAvatar(
 			locationState.nickname || 'Berk',
