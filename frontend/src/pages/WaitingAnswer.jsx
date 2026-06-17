@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { createStompClient } from '../api/websocket'
+import api from '../api/http'
 
 function WaitingAnswer() {
   const location = useLocation()
@@ -10,6 +11,9 @@ function WaitingAnswer() {
   const gamePin = locationState.pin
   const playerId = locationState.playerId
   const nickname = locationState.nickname
+  const questionId = locationState.questionId
+  const choiceId = locationState.choiceId
+  const timeTakenMs = locationState.timeTakenMs
   // The choice index the player selected (0–3) used for icon display
   const selectedIndex = locationState.selectedIndex ?? null
 
@@ -22,6 +26,26 @@ function WaitingAnswer() {
   const answerResultRef = useRef(httpAnswerResult)
   const [answerResult, setAnswerResult] = useState(httpAnswerResult)
   const [dots, setDots] = useState(1)
+  const [hasSubmitted, setHasSubmitted] = useState(false)
+
+  // Submit answer if it was not submitted yet (passed from GameRoom)
+  useEffect(() => {
+    if (questionId && choiceId !== undefined && timeTakenMs !== undefined && !hasSubmitted) {
+      setHasSubmitted(true)
+      api.post('/api/games/answer', {
+        roomCode: gamePin,
+        playerId,
+        questionId,
+        choiceId,
+        timeTakenMs,
+      }).then(res => {
+         if (!answerResultRef.current) {
+            answerResultRef.current = res.data
+            setAnswerResult(res.data)
+         }
+      }).catch(err => console.error('Answer submit error:', err))
+    }
+  }, [questionId, choiceId, timeTakenMs, hasSubmitted, gamePin, playerId])
 
   // Animated dots for the waiting text
   useEffect(() => {
@@ -46,7 +70,7 @@ function WaitingAnswer() {
 
           if (event.type === 'ANSWER_RESULT') {
             // WebSocket fallback only — use if HTTP result wasn't available
-            if (!answerResultRef.current) {
+            if (!answerResultRef.current && payload.playerId === playerId) {
               answerResultRef.current = payload
               setAnswerResult(payload)
             }
@@ -93,13 +117,19 @@ function WaitingAnswer() {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center gap-10 px-6">
       {/* Top bar */}
-      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-6 py-4">
+      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-6 py-4 bg-slate-800 shadow-lg z-10">
         <div className="font-extrabold text-xl text-emerald-400">QuizUp</div>
-        <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
-          PIN: {gamePin}
-        </div>
-        <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-emerald-400">
-          {nickname}
+        <div className="flex gap-3 items-center">
+          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
+            PIN: {gamePin}
+          </div>
+          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70 flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-300 text-yellow-700 text-xs">★</span>
+            {localStorage.getItem('quiz-total-points') || 0}
+          </div>
+          <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-full px-4 py-2 text-sm font-bold text-emerald-400">
+            {nickname}
+          </div>
         </div>
       </div>
 

@@ -178,20 +178,6 @@ function GameRoom() {
     // Prevent duplicate submission
     if (!question || selectedIndex !== null) return
 
-    let answerResult = null
-    try {
-      const res = await api.post('/api/games/answer', {
-        roomCode: gamePin,
-        playerId,
-        questionId: question.id,
-        choiceId: -1, // -1 = no answer selected
-        timeTakenMs: (question.timeLimit || 0) * 1000,
-      })
-      answerResult = res.data ?? null
-    } catch (err) {
-      console.error('Auto-submit error:', err)
-    }
-
     // Navigate to waiting screen, carrying the result
     navigate('/waiting', {
       replace: true,
@@ -200,7 +186,10 @@ function GameRoom() {
         playerId,
         nickname,
         selectedIndex: null,
-        answerResult,
+        questionId: question.id,
+        choiceId: -1,
+        timeTakenMs: (question.timeLimit || 0) * 1000,
+        answerResult: null,
       },
     })
   }
@@ -219,37 +208,20 @@ function GameRoom() {
     // Calculate response time
     const timeTakenMs = Date.now() - startTimeRef.current
 
-    try {
-      // Capture the HTTP response — the backend already returns AnswerResultDTO
-      // (correct, points, totalScore) as the HTTP response body, so we don't
-      // need to rely on the WebSocket ANSWER_RESULT which always fires before
-      // WaitingAnswer has a chance to subscribe.
-      const res = await api.post('/api/games/answer', {
-        roomCode: gamePin,
+    // Go to waiting screen instantly, carry data so WaitingAnswer can submit it
+    navigate('/waiting', {
+      replace: true,
+      state: {
+        pin: gamePin,
         playerId,
+        nickname,
+        selectedIndex: index,
         questionId: question.id,
         choiceId,
         timeTakenMs,
-      })
-
-      // Go to waiting screen, carrying the result so /results can show it
-      navigate('/waiting', {
-        replace: true,
-        state: {
-          pin: gamePin,
-          playerId,
-          nickname,
-          selectedIndex: index,
-          answerResult: res.data ?? null,
-        },
-      })
-
-    } catch (err) {
-      console.error('Answer submit error:', err)
-
-      // Reset selection if request fails
-      setSelectedIndex(null)
-    }
+        answerResult: null,
+      },
+    })
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -294,6 +266,12 @@ function GameRoom() {
           {/* Game PIN */}
           <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
             PIN: {gamePin}
+          </div>
+
+          {/* Total Score */}
+          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70 flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-300 text-yellow-700 text-xs">★</span>
+            {localStorage.getItem('quiz-total-points') || 0}
           </div>
 
           {/* Player name */}
