@@ -6,6 +6,23 @@ export default function Navbar_res({ pin, score }) {
 
   const [user, setUser] = useState(null);
 
+  // Read score from localStorage the same way WaitingAnswer does.
+  // The 'score' prop overrides if explicitly passed; otherwise use localStorage.
+  const [localScore, setLocalScore] = useState(
+    () => Number(localStorage.getItem('quiz-total-points')) || 0
+  );
+
+  // Keep score badge live — update whenever localStorage changes
+  // (e.g. after each question result is saved by AnswerRes).
+  useEffect(() => {
+    const onStorage = () =>
+      setLocalScore(Number(localStorage.getItem('quiz-total-points')) || 0);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  const displayScore = score !== undefined ? score : localScore;
+
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("user");
@@ -46,15 +63,15 @@ export default function Navbar_res({ pin, score }) {
 
 
         {/* RIGHT SIDE */}
-					<div className="flex items-center gap-3">
-							<div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">
-								GAME PIN: <span className="text-gray-50">{pin || '123456'}</span>
-							</div>
-							<div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm flex items-center gap-2">
-								<span className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-300 text-yellow-700">★</span>
-								{score !== undefined ? score : 0}
-							</div>
-					</div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm">
+            GAME PIN: <span className="text-gray-50">{pin || '123456'}</span>
+          </div>
+          <div className="rounded-full bg-slate-500 px-5 py-2 text-sm font-semibold text-white shadow-sm flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-yellow-300 text-yellow-700">★</span>
+            {score !== undefined ? score : 0}
+          </div>
+        </div>
       </div>
     </header>
   );
