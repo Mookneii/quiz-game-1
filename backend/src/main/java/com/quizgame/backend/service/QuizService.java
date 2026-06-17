@@ -68,28 +68,7 @@ public class QuizService {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
 
-        List<QuestionRequestDTO> questionDTOs = quiz.getQuestions().stream().map(q -> {
-            QuestionRequestDTO qDto = new QuestionRequestDTO();
-            qDto.setQuestionText(q.getQuestionText());
-            qDto.setTimeLimit(q.getTimeLimit());
-            qDto.setDifficulty(q.getDifficulty());
-
-            List<ChoiceRequestDTO> cDtos = q.getChoices().stream().map(c -> {
-                ChoiceRequestDTO cDto = new ChoiceRequestDTO();
-                cDto.setChoiceText(c.getChoiceText());
-                cDto.setIsCorrect(c.getIsCorrect());
-                return cDto;
-            }).collect(Collectors.toList());
-
-            qDto.setChoices(cDtos);
-            return qDto;
-        }).collect(Collectors.toList());
-
-        return new QuizResponseDTO(
-                quiz.getId(),
-                quiz.getTitle(),
-                quiz.getDescription(),
-                questionDTOs);
+        return toDTO(quiz);
     }
 
     public QuizResponseDTO updateQuiz(Long id, QuizRequestDTO request) {
@@ -113,10 +92,7 @@ public class QuizService {
 
         Quiz savedQuiz = quizRepository.save(quiz);
 
-        return new QuizResponseDTO(
-                savedQuiz.getId(),
-                savedQuiz.getTitle(),
-                savedQuiz.getDescription());
+        return toDTO(savedQuiz);
     }
 
     public void deleteQuiz(Long id) {
@@ -236,21 +212,21 @@ public class QuizService {
             }
         }
 
-        if (correct.startsWith("answer") && correct.length() > 6) {
+        if (correctAnswer.startsWith("answer") && correctAnswer.length() > 6) {
             try {
-                int idx = Integer.parseInt(correct.substring(6)) - 1;
-                if (idx >= 0 && idx < choices.size())
+                int idx = Integer.parseInt(correctAnswer.substring(6)) - 1;
+                if (idx >= 0 && idx < choiceRequests.size())
                     return idx;
             } catch (NumberFormatException ignored) {
             }
         }
 
-        for (int i = 0; i < choices.size(); i++) {
-            if (normalize(choices.get(i).getChoiceText()).equals(correct))
+        for (int i = 0; i < choiceRequests.size(); i++) {
+            if (normalize(choiceRequests.get(i).getChoiceText()).equals(correctAnswer))
                 return i;
         }
 
-        return choices.size() == 1 ? 0 : -1;
+        return choiceRequests.size() == 1 ? 0 : -1;
     }
 
     private String normalize(String value) {

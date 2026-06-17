@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import { createRoom } from "../api/room";
 
 export default function HostDashboard() {
   const navigate = useNavigate();
@@ -115,6 +116,27 @@ export default function HostDashboard() {
         questions: selectedQuiz.questions || [],
       },
     });
+  };
+
+  const handleHost = async (quiz) => {
+    try {
+      const response = await createRoom({
+        quizId: quiz.id || quiz._id,
+        hostId: user?.id || user?._id || 1,
+        hostName: user?.fullName || "Host"
+      });
+      const roomCode = response.data.roomCode;
+      navigate(`/host/${roomCode}`, {
+        state: {
+          pin: roomCode,
+          hostId: user?.id || user?._id || 1,
+          hostName: user?.fullName || "Host"
+        }
+      });
+    } catch (error) {
+      console.error("Failed to create room:", error);
+      alert("Failed to start hosting game. Please try again.");
+    }
   };
 
   return (
@@ -245,7 +267,7 @@ export default function HostDashboard() {
                       </button>
 
                       <button
-                        onClick={() => navigate(`/host/${targetId}`)}
+                        onClick={() => handleHost(quiz)}
                         className="flex-1 border border-blue-500 text-blue-500 hover:bg-blue-50 py-3 rounded-xl font-semibold transition"
                       >
                         Host

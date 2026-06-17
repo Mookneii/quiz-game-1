@@ -8,28 +8,16 @@ public class QuizResponseDTO {
     private String title;
     private String description;
     private Integer questionsCount;
-    private List<QuestionRequestDTO> questions;
+    private List<QuestionDTO> questions;
 
     public QuizResponseDTO() {
     }
 
-    public QuizResponseDTO(Long id, String title, String description) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
-    }
-
-    public QuizResponseDTO(Long id, String title, String description, Integer questionsCount) {
+    public QuizResponseDTO(Long id, String title, String description, int questionsCount, List<QuestionDTO> questions) {
         this.id = id;
         this.title = title;
         this.description = description;
         this.questionsCount = questionsCount;
-    }
-
-    public QuizResponseDTO(Long id, String title, String description, List<QuestionRequestDTO> questions) {
-        this.id = id;
-        this.title = title;
-        this.description = description;
         this.questions = questions;
     }
 
@@ -45,23 +33,67 @@ public class QuizResponseDTO {
         return description;
     }
 
-    public int getQuestionsCount() {
-        return questionsCount;
+    public QuizResponseDTO(Long id, String title, String description, Integer questionsCount) {
+        this.id = id;
+        this.title = title;
+        this.description = description;
+        this.questionsCount = questionsCount;
+    }
+
+    // ── Nested DTOs ──────────────────────────────────────────────────────────
+
+    public static class QuestionDTO {
+        private Long id;
+        private String question; // mapped from questionText
+        private String difficulty;
+        private Integer correct; // index of correct choice
+        private List<String> answers; // list of choiceText strings
+
+        public QuestionDTO() {
+        }
+
+        public Long getId() {
+            return id;
+        }
+
+        public String getQuestion() {
+            return question;
+        }
+
+        public String getDifficulty() {
+            return difficulty;
+        }
+
+        public Integer getCorrect() {
+            return correct;
+        }
+
+        public List<String> getAnswers() {
+            return answers;
+        }
+
+        public void setId(Long id) {
+            this.id = id;
+        }
+
+        public void setQuestion(String question) {
+            this.question = question;
+        }
+
+        public void setDifficulty(String difficulty) {
+            this.difficulty = difficulty;
+        }
+
+        public void setCorrect(Integer correct) {
+            this.correct = correct;
+        }
+
+        public void setAnswers(List<String> answers) {
+            this.answers = answers;
+        }
     }
 
     public List<QuestionDTO> getQuestions() {
-        return questions;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public List<QuestionRequestDTO> getQuestions() {
         return questions;
     }
 
@@ -85,7 +117,7 @@ public class QuizResponseDTO {
         this.questionsCount = questionsCount;
     }
 
-    public void setQuestions(List<QuestionRequestDTO> questions) {
+    public void setQuestions(List<QuestionDTO> questions) {
         this.questions = questions;
     }
 }
