@@ -1,146 +1,137 @@
 // ================================================
-// FULLY FIXED QUIZ BUILDER
+// EDIT / ADD QUESTIONS PAGE
 // ================================================
+import React, { useRef, useState, useEffect } from "react"; 
+import { useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft, Plus, Sparkles, Pencil, Trash2, Settings2, Check, Loader2 } from "lucide-react";
+import Sidebar from "../components/Sidebar";
 
-import React, { useRef, useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { generateQuizFromDocument, createQuiz, getQuiz, updateQuiz } from "../api/quiz";
-
-import {
-  ArrowLeft,
-  Plus,
-  Sparkles,
-  Pencil,
-  Trash2,
-  Settings2,
-  Upload,
-  Check,
-  Eye,
-} from "lucide-react";
+const LOCAL_AI_URL = "http://localhost:11434/api/generate";
 
 export default function EditQuiz() {
   const navigate = useNavigate();
-  const { quizId } = useParams();
-  
-  const coverInputRef = useRef(null);
+  const location = useLocation();
   const aiFileInputRef = useRef(null);
 
-  // No page state, just edit mode
+  // Pull forwarded state properties from router context safely
+  const quiz = location.state?.quiz || { title: "", description: "", cover: null };
+  const [questions, setQuestions] = useState(location.state?.questions || []);
+  const [editingQuizId] = useState(location.state?.editingQuizId || null);
 
-  const [quiz, setQuiz] = useState({
-    title: "",
-    description: "",
-    cover: null,
+  // ─── TRACKING STATE TO PREVENT INFINITE FETCH LOOPS ───
+  const [hasFetched, setHasFetched] = useState(false);
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const [showAddPanel, setShowAddPanel] = useState(false);
+  const [activeSettingIndex, setActiveSettingIndex] = useState(null);
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [deleteIndex, setDeleteIndex] = useState(null);
+
+  const [newQuestion, setNewQuestion] = useState({
+    question: "",
+    answers: ["", "", "", ""],
+    correct: null,
+    difficulty: "easy",
   });
 
-  const [questions, setQuestions] = useState([]);
-
-  const [showAddPanel, setShowAddPanel] =
-    useState(false);
-
-  // No preview state
-
-  const [isGeneratingAI, setIsGeneratingAI] =
-    useState(false);
-
-  const [activeSettingIndex, setActiveSettingIndex] =
-    useState(null);
-
-  const [editingQuestion, setEditingQuestion] =
-    useState(null);
-
-  const [deleteIndex, setDeleteIndex] =
-    useState(null);
-
-  const [newQuestion, setNewQuestion] =
-    useState({
-      question: "",
-      answers: ["", "", "", ""],
-      correct: null,
-      difficulty: "easy",
-    });
-
-  // No cover logic needed in edit view for questions
-
   // ========================================
-  // LOAD QUIZ IF EDITING
+  // FRESH DATA FETCH FROM BACKEND
   // ========================================
   useEffect(() => {
-    if (quizId) {
-      getQuiz(quizId)
-        .then((res) => {
-          if (res.data) {
-            setQuiz({
-              title: res.data.title || "",
-              description: res.data.description || "",
-              cover: null, // Assume no cover for simplicity unless handled
-            });
-            const loadedQs = (res.data.questions || []).map(q => {
-              const correctAnswerIdx = q.choices?.findIndex(c => c.isCorrect);
-              return {
-                question: q.questionText,
-                answers: q.choices?.map(c => c.choiceText) || ["", "", "", ""],
-                correct: correctAnswerIdx >= 0 ? correctAnswerIdx : null,
-                difficulty: "medium", // Default, could map from data if it existed
-              };
-            });
-            setQuestions(loadedQs);
+    // ✅ FIX: Fetch whenever editing an existing quiz if we haven't already fetched it on mount
+    if (editingQuizId && !hasFetched) {
+      const fetchQuizQuestions = async () => {
+        setIsLoading(true);
+        try {
+          const token = localStorage.getItem("token");
+          const response = await fetch(`http://localhost:8080/api/quizzes/${editingQuizId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data && data.questions) {
+              // ✅ FIX: Safe fallback parser handles both request format & database formats seamlessly
+              const formattedQuestions = data.questions.map((q) => {
+                // Find correct index matching whichever fields the backend provides
+                let correctIdx = 0;
+                if (q.correctChoiceIndex !== undefined) correctIdx = q.correctChoiceIndex;
+                else if (q.correct !== undefined) correctIdx = q.correct;
+
+                // Parse answers matching flat string array or nested choice object structures
+                let standardAnswers = ["", "", "", ""];
+                if (Array.isArray(q.answers)) {
+                  standardAnswers = q.answers;
+                } else if (Array.isArray(q.choices)) {
+                  standardAnswers = q.choices.map((c) => c.choiceText || "");
+                }
+
+                return {
+                  question: q.questionText || q.question || "", 
+                  difficulty: q.difficulty || "easy",
+                  correct: correctIdx, 
+                  answers: standardAnswers, 
+                };
+              });
+
+              setQuestions(formattedQuestions);
+            }
+            setHasFetched(true); // Flag fetch completion to prevent loop re-triggers
           }
-        })
-        .catch((err) => console.error("Error loading quiz", err));
+        } catch (error) {
+          console.error("Error fetching existing quiz questions:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchQuizQuestions();
     }
-  }, [quizId]);
+  }, [editingQuizId, hasFetched]);
+
+  const handleBackToInfo = () => {
+    navigate("/create-quiz", {
+      state: { quiz, questions, editingQuizId },
+    });
+  };
 
   // ========================================
-  // REAL AI GENERATE
+  // AI IMPORT PARSER
   // ========================================
-
   const handleAIImport = async (e) => {
     const file = e.target.files[0];
-
     if (!file) return;
 
     setIsGeneratingAI(true);
-
     try {
-      const response = await generateQuizFromDocument(
-        file,
-        "MEDIUM",
-        "MCQ",
-        5, // Requesting 5 questions by default
-        "llama3.2:latest"
-      );
+      const formData = new FormData();
+      formData.append("file", file);
 
-      if (response?.data?.questions) {
-        const generatedQuestions = response.data.questions.map(q => ({
-          question: q.questionText || q.text || "",
-          answers: [
-            q.choices?.[0]?.choiceText || "",
-            q.choices?.[1]?.choiceText || "",
-            q.choices?.[2]?.choiceText || "",
-            q.choices?.[3]?.choiceText || ""
-          ],
-          correct: q.choices?.findIndex(c => c.isCorrect === true || c.correct === true) >= 0 
-                   ? q.choices.findIndex(c => c.isCorrect === true || c.correct === true) 
-                   : (typeof q.correctChoiceIndex === "number" ? q.correctChoiceIndex : 0),
-          difficulty: q.difficulty?.toLowerCase() || "medium",
-        }));
-        
-        setQuestions((prev) => [
-          ...prev,
-          ...generatedQuestions,
-        ]);
-        
-        // Also update quiz info if it's empty
-        if (!quiz.title && response.data.title) {
-          setQuiz(prev => ({...prev, title: response.data.title}));
-        }
-        if (!quiz.description && response.data.description) {
-          setQuiz(prev => ({...prev, description: response.data.description}));
-        }
+      const response = await fetch(LOCAL_AI_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI endpoint error: ${response.status}`);
       }
-    } catch (err) {
-      alert("Error generating quiz: " + (err.response?.data?.message || err.message));
+
+      const data = await response.json();
+      const generatedQuestions = Array.isArray(data) ? data : data.questions || [];
+
+      if (!Array.isArray(generatedQuestions) || generatedQuestions.length === 0) {
+        throw new Error("Invalid response format from AI endpoint");
+      }
+
+      setQuestions((prev) => [...prev, ...generatedQuestions]);
+    } catch (error) {
+      console.error("Error generating questions:", error);
+      alert(`Failed to generate questions: ${error.message}`);
     } finally {
       setIsGeneratingAI(false);
       e.target.value = "";
@@ -148,239 +139,159 @@ export default function EditQuiz() {
   };
 
   // ========================================
-  // SAVE QUESTION
+  // MANAGING QUESTION BLOCKS
   // ========================================
-
   const saveQuestion = () => {
-    if (!newQuestion.question.trim()) {
-      alert("Please input question");
-      return;
-    }
+    if (!newQuestion.question.trim()) return alert("Please input question");
+    if (newQuestion.answers.some((a) => a.trim() === "")) return alert("Please fill all answers");
+    if (newQuestion.correct === null) return alert("Please select correct answer");
 
-    if (
-      newQuestion.answers.some(
-        (a) => a.trim() === ""
-      )
-    ) {
-      alert("Please fill all answers");
-      return;
-    }
-
-    if (newQuestion.correct === null) {
-      alert("Please select correct answer");
-      return;
-    }
-
-    setQuestions((prev) => [
-      ...prev,
-      {
-        ...newQuestion,
-        answers: [...newQuestion.answers],
-      },
-    ]);
-
-    setNewQuestion({
-      question: "",
-      answers: ["", "", "", ""],
-      correct: null,
-      difficulty: "easy",
-    });
-
+    setQuestions((prev) => [...prev, { ...newQuestion, answers: [...newQuestion.answers] }]);
+    setNewQuestion({ question: "", answers: ["", "", "", ""], correct: null, difficulty: "easy" });
     setShowAddPanel(false);
   };
 
-  // ========================================
-  // DELETE QUESTION
-  // ========================================
-
   const deleteQuestion = () => {
-    const updated = questions.filter(
-      (_, i) => i !== deleteIndex
-    );
-
-    setQuestions(updated);
-
+    setQuestions(questions.filter((_, i) => i !== deleteIndex));
     setDeleteIndex(null);
   };
 
-  // ========================================
-  // SAVE EDIT
-  // ========================================
-
   const saveEdit = () => {
-    if (!editingQuestion.data.question.trim()) {
-      alert("Question required");
-      return;
-    }
-
-    if (
-      editingQuestion.data.answers.some(
-        (a) => a.trim() === ""
-      )
-    ) {
-      alert("All answers required");
-      return;
-    }
+    if (!editingQuestion.data.question.trim()) return alert("Question required");
+    if (editingQuestion.data.answers.some((a) => a.trim() === "")) return alert("All answers required");
+    if (editingQuestion.data.correct === null) return alert("Please select a correct answer");
 
     const updated = [...questions];
-
     updated[editingQuestion.index] = {
       ...editingQuestion.data,
       answers: [...editingQuestion.data.answers],
     };
-
     setQuestions(updated);
-
     setEditingQuestion(null);
   };
 
+  // ========================================
+  // POST / PUT SUBMISSION HANDLER
+  // ========================================
+  const saveDone = async () => {
+    if (!quiz.title.trim()) return alert("Please enter a quiz title in the previous screen");
+    if (questions.length === 0) return alert("Please add at least one question");
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+      if (!token) return alert("Session expired. Please login again.");
+
+      const quizData = {
+        title: quiz.title,
+        description: quiz.description,
+        creatorId: user.id,
+        questions: questions.map((q) => ({
+          questionText: q.question,
+          difficulty: q.difficulty,
+          timeLimit: 30,
+          correctChoiceIndex: q.correct, 
+          correctAnswer: q.answers[q.correct] || "", 
+          choices: q.answers.map((ans, i) => ({
+            choiceText: ans,
+            isCorrect: i === q.correct, 
+          })),
+        })),
+      };
+
+      const url = editingQuizId
+        ? `http://localhost:8080/api/quizzes/${editingQuizId}`
+        : "http://localhost:8080/api/quizzes";
+      const method = editingQuizId ? "PUT" : "POST";
+
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(quizData),
+      });
+
+      if (!response.ok) throw new Error("Failed to save quiz configurations");
+
+      window.dispatchEvent(new Event("quizSaved"));
+      navigate("/host");
+    } catch (error) {
+      alert("Failed to save quiz: " + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-100">
-      {/* NAVBAR */}
+    <div className="min-h-screen bg-zinc-100 flex flex-col md:flex-row">
+      <Sidebar activeMenu="create-quiz" isOpen={true} onToggle={() => {}} />
 
-      <div className="h-16 bg-white border-b flex items-center justify-between px-6">
-        <button
-          onClick={() => navigate("/host")}
-          className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
-        >
-          ←
-        </button>
-
-        <h1 className="text-xl font-black text-emerald-500">QuizUp</h1>
-
-        <div />
-      </div>
-
-      {/* EDIT PAGE */}
-
-      <div className="p-10">
-
-          {/* HEADER */}
-
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-4xl font-black">
-                Edit / Add Questions
-              </h2>
-
-              <p className="text-zinc-500 mt-2">
-                Manage your quiz questions
-              </p>
-            </div>
-
-            <div className="flex gap-3">
-              {/* DONE */}
-
-              <button
-                onClick={async () => {
-                  try {
-                    const mappedQuestions = questions.map(q => ({
-                      questionText: q.question,
-                      choices: q.answers.map((ans, i) => ({
-                        choiceText: ans,
-                        isCorrect: i === q.correct
-                      }))
-                    }));
-                    
-                    const token = localStorage.getItem("token");
-                    const userStr = localStorage.getItem("user");
-                    const user = userStr ? JSON.parse(userStr) : null;
-                    
-                    if (!token) {
-                      navigate("/login");
-                      return;
-                    }
-                    
-                    const quizData = {
-                      id: quizId || null,
-                      title: quiz.title || "Untitled Quiz",
-                      description: quiz.description || "",
-                      creatorId: user?.id,
-                      questions: mappedQuestions
-                    };
-
-                    if (quizId) {
-                      await updateQuiz(quizId, quizData);
-                    } else {
-                      await createQuiz(quizData);
-                    }
-                    
-                    navigate("/host");
-                  } catch (err) {
-                    alert("Error saving quiz: " + (err.response?.data?.message || err.message));
-                  }
-                }}
-                className="bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold"
-              >
-                Done
-              </button>
-
-              {/* AI */}
-
-              <input
-                hidden
-                type="file"
-                ref={aiFileInputRef}
-                onChange={handleAIImport}
-              />
-
-              <button
-                disabled={isGeneratingAI}
-                onClick={() =>
-                  aiFileInputRef.current.click()
-                }
-                className={`px-5 py-3 rounded-2xl font-bold flex items-center gap-2 text-white ${
-                  isGeneratingAI
-                    ? "bg-emerald-300 cursor-not-allowed"
-                    : "bg-emerald-500"
-                }`}
-              >
-                <Sparkles size={18} />
-
-                {isGeneratingAI
-                  ? "Generating..."
-                  : "AI Generate"}
-              </button>
-
-              {/* ADD */}
-
-              <button
-                onClick={() =>
-                  setShowAddPanel(true)
-                }
-                className="bg-zinc-900 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2"
-              >
-                <Plus size={18} />
-                Add Question
-              </button>
-            </div>
+      <div className="flex-1 flex flex-col p-4 md:p-10">
+        {/* TOP COMPONENT INTERFACE HEAD */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <button
+              onClick={handleBackToInfo}
+              className="w-10 h-10 rounded-xl bg-white border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center justify-center transition mb-4 shadow-sm"
+              aria-label="Back to Quiz Details"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <h2 className="text-2xl md:text-4xl font-black">Edit / Add Questions</h2>
+            <p className="text-zinc-500 mt-2">Manage your quiz question sets</p>
           </div>
 
-          {/* QUESTIONS */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <button
+              onClick={saveDone}
+              disabled={isSaving}
+              className={`text-white px-5 py-3 rounded-2xl font-bold transition min-w-[100px] ${
+                isSaving ? "bg-blue-300 cursor-not-allowed" : "bg-blue-500 hover:bg-blue-600"
+              }`}
+            >
+              {isSaving ? "Saving..." : "Done"}
+            </button>
 
+            <input hidden type="file" ref={aiFileInputRef} onChange={handleAIImport} />
+            <button
+              disabled={isGeneratingAI}
+              onClick={() => aiFileInputRef.current.click()}
+              className={`px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2 text-white ${
+                isGeneratingAI ? "bg-emerald-300 cursor-not-allowed" : "bg-emerald-500"
+              }`}
+            >
+              <Sparkles size={18} />
+              {isGeneratingAI ? "Generating..." : "AI Generate"}
+            </button>
+
+            <button
+              onClick={() => setShowAddPanel(true)}
+              className="bg-zinc-900 text-white px-5 py-3 rounded-2xl font-bold flex items-center justify-center gap-2"
+            >
+              <Plus size={18} /> Add Question
+            </button>
+          </div>
+        </div>
+
+        {/* QUESTIONS DISPLAY ARRAY OR LOADING WHEEL */}
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-20 text-zinc-500 gap-2">
+            <Loader2 className="animate-spin text-blue-500" size={32} />
+            <p className="font-bold">Loading questions from server...</p>
+          </div>
+        ) : (
           <div className="mt-10 space-y-4">
             {questions.map((q, index) => (
-              <div
-                key={index}
-                className="bg-white rounded-3xl border p-6"
-              >
+              <div key={index} className="bg-white rounded-3xl border p-6">
                 <div className="flex justify-between">
                   <div className="flex-1">
-                    <div className="font-black text-lg">
-                      {index + 1}. {q.question}
-                    </div>
-
+                    <div className="font-black text-lg">{index + 1}. {q.question}</div>
                     <div className="mt-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${
-                          q.difficulty === "easy"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : q.difficulty ===
-                              "medium"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
+                      <span className="px-3 py-1 rounded-full text-xs font-bold capitalize bg-zinc-100 text-zinc-700">
                         {q.difficulty}
                       </span>
                     </div>
@@ -390,75 +301,44 @@ export default function EditQuiz() {
                         <div
                           key={i}
                           className={`border rounded-2xl p-3 flex items-center gap-2 ${
-                            q.correct === i
-                              ? "bg-emerald-50 border-emerald-400"
-                              : ""
+                            q.correct === i ? "bg-emerald-50 border-emerald-400 font-medium text-emerald-900" : "text-zinc-700"
                           }`}
                         >
-                          {q.correct === i && (
-                            <Check size={16} />
-                          )}
-
+                          {q.correct === i && <Check size={16} className="text-emerald-600" />}
                           {ans}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* SETTINGS */}
-
+                  {/* SETTINGS MENU BUTTON */}
                   <div className="relative ml-4">
                     <button
-                      onClick={() =>
-                        setActiveSettingIndex(
-                          activeSettingIndex ===
-                            index
-                            ? null
-                            : index
-                        )
-                      }
-                      className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center"
+                      onClick={() => setActiveSettingIndex(activeSettingIndex === index ? null : index)}
+                      className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition"
                     >
                       <Settings2 size={18} />
                     </button>
 
-                    {activeSettingIndex ===
-                      index && (
-                      <div className="absolute right-0 mt-2 bg-white border shadow-xl rounded-2xl p-2 flex gap-2 z-20">
-                        {/* EDIT */}
-
+                    {activeSettingIndex === index && (
+                      <div className="absolute right-0 mt-2 bg-white border shadow-xl rounded-2xl p-2 flex gap-2 z-20 min-w-[110px]">
                         <button
                           onClick={() => {
-                            setActiveSettingIndex(
-                              null
-                            );
-
-                            setEditingQuestion({
-                              index,
-                              data: {
-                                ...q,
-                                answers: [
-                                  ...q.answers,
-                                ],
-                              },
-                            });
+                            setActiveSettingIndex(null);
+                            setEditingQuestion({ index, data: { ...q, answers: [...q.answers] } });
                           }}
-                          className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center"
+                          className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition text-zinc-700"
+                          title="Edit Question"
                         >
                           <Pencil size={16} />
                         </button>
-
-                        {/* DELETE */}
-
                         <button
                           onClick={() => {
-                            setActiveSettingIndex(
-                              null
-                            );
-
+                            setActiveSettingIndex(null);
                             setDeleteIndex(index);
                           }}
-                          className="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"
+                          className="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center hover:bg-red-200 transition"
+                          title="Delete Question"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -468,166 +348,130 @@ export default function EditQuiz() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
 
-            {/* ADD PANEL */}
+      {/* MODAL POPUP FOR CREATING NEW QUESTIONS */}
+      {showAddPanel && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full md:w-[800px] rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-black">Add New Question</h2>
+              <button 
+                onClick={() => setShowAddPanel(false)} 
+                className="text-zinc-400 hover:text-zinc-600 border px-4 py-2 rounded-2xl font-bold text-sm transition"
+              >
+                Close
+              </button>
+            </div>
 
-            {showAddPanel && (
-              <div className="bg-white border-2 border-dashed rounded-3xl p-6">
-                <input
-                  className="w-full border rounded-2xl px-4 py-3"
-                  placeholder="Input question..."
-                  value={newQuestion.question}
-                  onChange={(e) =>
-                    setNewQuestion({
-                      ...newQuestion,
-                      question:
-                        e.target.value,
-                    })
-                  }
-                />
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Set Difficulty Level</label>
+                <div className="flex gap-2 max-w-xs">
+                  {["easy", "medium", "hard"].map((level) => {
+                    const isActive = newQuestion.difficulty === level;
+                    let activeStyles = "";
+                    if (level === "easy") activeStyles = "bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/20 shadow-lg";
+                    if (level === "medium") activeStyles = "bg-amber-500 border-amber-500 text-white shadow-amber-500/20 shadow-lg";
+                    if (level === "hard") activeStyles = "bg-rose-500 border-rose-500 text-white shadow-rose-500/20 shadow-lg";
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                  {newQuestion.answers.map(
-                    (a, i) => (
-                      <input
-                        key={i}
-                        className="border rounded-2xl px-4 py-3"
-                        placeholder={`Answer ${
-                          i + 1
-                        }`}
-                        value={a}
-                        onChange={(e) => {
-                          const updated = [
-                            ...newQuestion.answers,
-                          ];
-
-                          updated[i] =
-                            e.target.value;
-
-                          setNewQuestion({
-                            ...newQuestion,
-                            answers: updated,
-                          });
-                        }}
-                      />
-                    )
-                  )}
-                </div>
-
-                <div className="mt-6">
-                  <div className="font-bold text-sm mb-2">
-                    Pick Correct Answer
-                  </div>
-
-                  <div className="flex gap-2">
-                    {[0, 1, 2, 3].map(
-                      (i) => (
-                        <button
-                          key={i}
-                          onClick={() =>
-                            setNewQuestion({
-                              ...newQuestion,
-                              correct: i,
-                            })
-                          }
-                          className={`w-12 h-12 rounded-2xl border font-black ${
-                            newQuestion.correct ===
-                            i
-                              ? "bg-emerald-500 text-white"
-                              : ""
-                          }`}
-                        >
-                          {String.fromCharCode(
-                            65 + i
-                          )}
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <div className="font-bold text-sm mb-2">
-                    Difficulty
-                  </div>
-
-                  <div className="flex gap-2">
-                    {[
-                      "easy",
-                      "medium",
-                      "hard",
-                    ].map((diff) => (
+                    return (
                       <button
-                        key={diff}
-                        onClick={() =>
-                          setNewQuestion({
-                            ...newQuestion,
-                            difficulty: diff,
-                          })
-                        }
-                        className={`px-4 py-2 rounded-xl font-bold capitalize ${
-                          newQuestion.difficulty ===
-                          diff
-                            ? "bg-emerald-500 text-white"
-                            : "bg-zinc-100"
+                        key={level}
+                        type="button"
+                        onClick={() => setNewQuestion({ ...newQuestion, difficulty: level })}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold capitalize border transition-all duration-200 ${
+                          isActive ? activeStyles : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
                         }`}
                       >
-                        {diff}
+                        {level}
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 mt-8">
-                  <button
-                    onClick={() =>
-                      setShowAddPanel(false)
-                    }
-                    className="border px-5 py-3 rounded-2xl font-bold"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={saveQuestion}
-                    className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
-                  >
-                    Save Question
-                  </button>
+                    );
+                  })}
                 </div>
               </div>
-            )}
-          </div>
-        </div>
 
-      {/* DELETE MODAL */}
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Question Text</label>
+                <input
+                  className="w-full border rounded-2xl px-4 py-3 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  placeholder="Type your question prompt here..."
+                  value={newQuestion.question}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+                />
+              </div>
 
-      {deleteIndex !== null && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[420px] rounded-3xl p-8">
-            <h2 className="text-2xl font-black">
-              Delete Question
-            </h2>
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Answer Choices</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {newQuestion.answers.map((a, i) => (
+                    <input
+                      key={i}
+                      className="border rounded-2xl px-4 py-3 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      placeholder={`Choice ${String.fromCharCode(65 + i)}`}
+                      value={a}
+                      onChange={(e) => {
+                        const updated = [...newQuestion.answers];
+                        updated[i] = e.target.value;
+                        setNewQuestion({ ...newQuestion, answers: updated });
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
 
-            <p className="text-zinc-500 mt-3">
-              Are you sure you want to delete
-              this question?
-            </p>
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Select Correct Answer</label>
+                <div className="flex gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setNewQuestion({ ...newQuestion, correct: i })}
+                      className={`w-14 h-14 rounded-2xl border-2 font-black text-lg transition-all ${
+                        newQuestion.correct === i 
+                          ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                          : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-            <div className="flex justify-end gap-3 mt-8">
-              <button
-                onClick={() =>
-                  setDeleteIndex(null)
-                }
-                className="border px-5 py-3 rounded-2xl font-bold"
+            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-100">
+              <button 
+                onClick={() => setShowAddPanel(false)} 
+                className="border border-zinc-200 px-6 py-3 rounded-2xl font-bold hover:bg-zinc-50 transition"
               >
                 Cancel
               </button>
-
-              <button
-                onClick={deleteQuestion}
-                className="bg-red-500 text-white px-5 py-3 rounded-2xl font-bold"
+              <button 
+                onClick={saveQuestion} 
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-md transition"
               >
+                Save Question
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* RENDER MODAL CONDITIONAL FOR DELETE */}
+      {deleteIndex !== null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h2 className="text-2xl font-black">Delete Question</h2>
+            <p className="text-zinc-500 mt-3">Are you sure you want to drop this question?</p>
+            <div className="flex justify-end gap-3 mt-8">
+              <button onClick={() => setDeleteIndex(null)} className="border px-5 py-3 rounded-2xl font-bold hover:bg-zinc-50 transition">
+                Cancel
+              </button>
+              <button onClick={deleteQuestion} className="bg-red-500 hover:bg-red-600 text-white px-5 py-3 rounded-2xl font-bold transition">
                 Delete
               </button>
             </div>
@@ -635,157 +479,118 @@ export default function EditQuiz() {
         </div>
       )}
 
-      {/* EDIT MODAL */}
-
+      {/* RENDER MODAL FOR INLINE QUESTION UPDATES */}
       {editingQuestion && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[800px] rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center">
-              <h2 className="text-3xl font-black">
-                Edit Question
-              </h2>
-
-              <button
-                onClick={() =>
-                  setEditingQuestion(null)
-                }
-                className="border px-4 py-2 rounded-2xl font-bold"
-              >
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full md:w-[800px] rounded-3xl p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-black">Edit Question</h2>
+              <button onClick={() => setEditingQuestion(null)} className="text-zinc-400 hover:text-zinc-600 border px-4 py-2 rounded-2xl font-bold text-sm transition">
                 Close
               </button>
             </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Edit Difficulty Level</label>
+                <div className="flex gap-2 max-w-xs">
+                  {["easy", "medium", "hard"].map((level) => {
+                    const isActive = editingQuestion.data.difficulty === level;
+                    let activeStyles = "";
+                    if (level === "easy") activeStyles = "bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/20 shadow-lg";
+                    if (level === "medium") activeStyles = "bg-amber-500 border-amber-500 text-white shadow-amber-500/20 shadow-lg";
+                    if (level === "hard") activeStyles = "bg-rose-500 border-rose-500 text-white shadow-rose-500/20 shadow-lg";
 
-            <div className="mt-6">
-              <input
-                className="w-full border rounded-2xl px-4 py-3"
-                value={
-                  editingQuestion.data.question
-                }
-                onChange={(e) =>
-                  setEditingQuestion({
-                    ...editingQuestion,
-                    data: {
-                      ...editingQuestion.data,
-                      question:
-                        e.target.value,
-                    },
-                  })
-                }
-              />
-            </div>
+                    return (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setEditingQuestion({
+                          ...editingQuestion,
+                          data: { ...editingQuestion.data, difficulty: level }
+                        })}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold capitalize border transition-all duration-200 ${
+                          isActive ? activeStyles : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                        }`}
+                      >
+                        {level}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6">
-              {editingQuestion.data.answers.map(
-                (ans, i) => (
-                  <input
-                    key={i}
-                    className="border rounded-2xl px-4 py-3"
-                    value={ans}
-                    onChange={(e) => {
-                      const updated = [
-                        ...editingQuestion.data
-                          .answers,
-                      ];
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Question Text</label>
+                <input
+                  className="w-full border rounded-2xl px-4 py-3 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  value={editingQuestion.data.question}
+                  onChange={(e) =>
+                    setEditingQuestion({
+                      ...editingQuestion,
+                      data: { ...editingQuestion.data, question: e.target.value },
+                    })
+                  }
+                />
+              </div>
 
-                      updated[i] =
-                        e.target.value;
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Answer Choices</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {editingQuestion.data.answers.map((ans, i) => (
+                    <input
+                      key={i}
+                      className="border rounded-2xl px-4 py-3 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      value={ans}
+                      onChange={(e) => {
+                        const updated = [...editingQuestion.data.answers];
+                        updated[i] = e.target.value;
+                        setEditingQuestion({
+                          ...editingQuestion,
+                          data: { ...editingQuestion.data, answers: updated },
+                        });
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
 
-                      setEditingQuestion({
+              <div>
+                <label className="block text-sm font-bold text-zinc-700 mb-2">Select Correct Answer</label>
+                <div className="flex gap-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setEditingQuestion({
                         ...editingQuestion,
-                        data: {
-                          ...editingQuestion.data,
-                          answers: updated,
-                        },
-                      });
-                    }}
-                  />
-                )
-              )}
-            </div>
-
-            <div className="mt-6">
-              <div className="font-bold text-sm mb-2">
-                Correct Answer
-              </div>
-
-              <div className="flex gap-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <button
-                    key={i}
-                    onClick={() =>
-                      setEditingQuestion({
-                        ...editingQuestion,
-                        data: {
-                          ...editingQuestion.data,
-                          correct: i,
-                        },
-                      })
-                    }
-                    className={`w-12 h-12 rounded-2xl border font-black ${
-                      editingQuestion.data
-                        .correct === i
-                        ? "bg-emerald-500 text-white"
-                        : ""
-                    }`}
-                  >
-                    {String.fromCharCode(
-                      65 + i
-                    )}
-                  </button>
-                ))}
+                        data: { ...editingQuestion.data, correct: i }
+                      })}
+                      className={`w-14 h-14 rounded-2xl border-2 font-black text-lg transition-all ${
+                        editingQuestion.data.correct === i 
+                          ? "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30" 
+                          : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div className="mt-6">
-              <div className="font-bold text-sm mb-2">
-                Difficulty
-              </div>
-
-              <div className="flex gap-2">
-                {[
-                  "easy",
-                  "medium",
-                  "hard",
-                ].map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() =>
-                      setEditingQuestion({
-                        ...editingQuestion,
-                        data: {
-                          ...editingQuestion.data,
-                          difficulty: diff,
-                        },
-                      })
-                    }
-                    className={`px-4 py-2 rounded-xl font-bold capitalize ${
-                      editingQuestion.data
-                        .difficulty === diff
-                        ? "bg-emerald-500 text-white"
-                        : "bg-zinc-100"
-                    }`}
-                  >
-                    {diff}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-10">
-              <button
-                onClick={() =>
-                  setEditingQuestion(null)
-                }
-                className="border px-5 py-3 rounded-2xl font-bold"
+            
+            <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-100">
+              <button 
+                onClick={() => setEditingQuestion(null)} 
+                className="border border-zinc-200 px-6 py-3 rounded-2xl font-bold hover:bg-zinc-50 transition"
               >
                 Cancel
               </button>
-
-              <button
-                onClick={saveEdit}
-                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
+              <button 
+                onClick={saveEdit} 
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold shadow-md transition"
               >
-                Save Changes
+                Save Modifications
               </button>
             </div>
           </div>
