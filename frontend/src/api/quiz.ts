@@ -6,7 +6,13 @@ export const createQuiz = (data: SaveQuizRequest) =>
   api.post('/api/quizzes', data);
 
 export const getQuiz = (quizId: string) =>
-  api.get(`/api/quiz/${quizId}`);
+  api.get(`/api/quizzes/${quizId}`);
+
+export const updateQuiz = (quizId: string, data: SaveQuizRequest) =>
+  api.put(`/api/quizzes/${quizId}`, data);
+
+export const deleteQuiz = (quizId: string) =>
+  api.delete(`/api/quizzes/${quizId}`);
 
 export const generateQuizFromDocument = (
   file: File,

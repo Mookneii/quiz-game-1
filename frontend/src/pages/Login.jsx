@@ -28,7 +28,7 @@ export default function Login() {
       setLoading(true);
 
       // API CALL
-      const response = await fetch("http://localhost:8080/api/auth/login", {
+      const response = await fetch(`http://${window.location.hostname}:8080/api/auth/login`, {
         method: "POST",
 
         headers: {
@@ -46,19 +46,20 @@ export default function Login() {
       }
 
       const data = await response.json();
+      console.log("LOGIN RESPONSE:", data);
 
       console.log("Login success:", data);
 
       // SAVE TOKEN
       localStorage.setItem("token", data.token);
 
-      
       // SAVE USER MANUALLY
       localStorage.setItem(
         "user",
         JSON.stringify({
-          email: email,
-          fullName: email.split("@")[0],
+          id: data.id,
+          email: data.email,
+          fullName: data.name,
         }),
       );
 
@@ -77,11 +78,11 @@ export default function Login() {
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <Link to="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-bold">
-            Q
-          </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white font-bold">
+              Q
+            </div>
 
-          <h1 className="text-2xl font-bold text-gray-800">QuizUp</h1>
+            <h1 className="text-2xl font-bold text-gray-800">QuizUp</h1>
           </Link>
         </div>
 

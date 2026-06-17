@@ -27,11 +27,7 @@ export default function CreateQuiz() {
   const handleCoverUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    setQuiz({
-      ...quiz,
-      cover: URL.createObjectURL(file),
-    });
+    setQuiz({ ...quiz, cover: URL.createObjectURL(file) });
   };
 
   const goToQuestions = () => {

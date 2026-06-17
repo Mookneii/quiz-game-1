@@ -8,18 +8,24 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
+
+// @EnableWebSocket vs @EnableWebSocketMessageBroker:
+//* */ @EnableWebSocket is used for simple WebSocket communication without the need for a message broker
+//* */ @EnableWebSocketMessageBroker is used when you want to use a message broker (like RabbitMQ, ActiveMQ, 
+//* */ or the simple in-memory broker) to handle messaging between clients and the server. 
+//* */ It provides additional features like message routing, topic subscriptions, and more complex messaging patterns.
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
-                .withSockJS();
+        registry.addEndpoint("/ws") //* declare websocket endpoint to connect to ws */
+                .setAllowedOriginPatterns("*") //! Allows cross-origin requests must be restrict in production*/
+                .withSockJS(); //*Enables SockJS fallback so clients that don’t support native WebSocket can use alternatives */
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.setApplicationDestinationPrefixes("/app");
-        registry.enableSimpleBroker("/topic");
+        registry.setApplicationDestinationPrefixes("/app"); //* Message sent from client to destination with /app are routed to @MessageMapping methods on server controller*/
+        registry.enableSimpleBroker("/topic"); //* Enables a simple in-memory message broker to carry messages back to the client on destinations prefixed with /topic */
     }
 }

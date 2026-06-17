@@ -36,17 +36,17 @@ public class AiQuizService {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
-        @Value("${ollama.enabled:true}")
-        private Boolean ollamaEnabled;
+    @Value("${ollama.enabled:true}")
+    private Boolean ollamaEnabled;
 
-        @Value("${ollama.base-url:http://localhost:11434}")
-        private String ollamaBaseUrl;
+    @Value("${ollama.base-url:http://localhost:11434}")
+    private String ollamaBaseUrl;
 
-        @Value("${ollama.model:llama3.2:latest}")
-        private String ollamaModel;
+    @Value("${ollama.model:llama3.2:latest}")
+    private String ollamaModel;
 
-        private static final String OLLAMA_GENERATE_PATH = "/api/generate";
-        private static final String OLLAMA_TAGS_PATH = "/api/tags";
+    private static final String OLLAMA_GENERATE_PATH = "/api/generate";
+    private static final String OLLAMA_TAGS_PATH = "/api/tags";
 
     public AiQuizGenerationResponse generateQuizFromDocument(
             AiQuizGenerationRequest request, InputStream fileInputStream, String fileName) {
@@ -83,12 +83,14 @@ public class AiQuizService {
             default -> throw new BadRequestException("Unsupported file format: " + fileExtension);
         };
     }
+
     private String extractTextFromPdf(InputStream inputStream) throws IOException {
         try (PDDocument document = Loader.loadPDF(new RandomAccessReadBuffer(inputStream))) {
             PDFTextStripper stripper = new PDFTextStripper();
             return stripper.getText(document);
         }
     }
+
     private String extractTextFromDocx(InputStream inputStream) throws IOException {
         StringBuilder text = new StringBuilder();
         try (XWPFDocument document = new XWPFDocument(inputStream)) {
@@ -98,14 +100,16 @@ public class AiQuizService {
         }
         return text.toString();
     }
+
     private String extractTextFromTxt(InputStream inputStream) throws IOException {
         return new String(inputStream.readAllBytes());
     }
+
     private String extractTextFromPptx(InputStream inputStream) throws IOException {
         // For PPTX, we'll extract text from slides using Apache POI
         StringBuilder text = new StringBuilder();
-        try (org.apache.poi.xslf.usermodel.XMLSlideShow slideShow =
-                     new org.apache.poi.xslf.usermodel.XMLSlideShow(inputStream)) {
+        try (org.apache.poi.xslf.usermodel.XMLSlideShow slideShow = new org.apache.poi.xslf.usermodel.XMLSlideShow(
+                inputStream)) {
             for (org.apache.poi.xslf.usermodel.XSLFSlide slide : slideShow.getSlides()) {
                 for (org.apache.poi.xslf.usermodel.XSLFShape shape : slide.getShapes()) {
                     if (shape instanceof org.apache.poi.xslf.usermodel.XSLFTextShape textShape) {
@@ -125,8 +129,6 @@ public class AiQuizService {
         return fileName.substring(lastIndexOf + 1);
     }
 
-    
-
     private AiQuizGenerationResponse generateQuizWithOllama(
             AiQuizGenerationRequest request, String documentContent) {
         try {
@@ -135,14 +137,12 @@ public class AiQuizService {
             String prompt = buildPrompt(request, documentContent);
 
             Map<String, Object> requestBody = Map.of(
-                "model", resolvedModel,
+                    "model", resolvedModel,
                     "prompt", prompt,
                     "stream", false,
                     "format", "json",
                     "options", Map.of(
-                            "temperature", 0.7
-                    )
-            );
+                            "temperature", 0.7));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -151,7 +151,8 @@ public class AiQuizService {
             String endpoint = ollamaBaseUrl + OLLAMA_GENERATE_PATH;
 
             @SuppressWarnings("unchecked")
-            Map<String, Object> response = (Map<String, Object>) restTemplate.postForObject(endpoint, entity, Map.class);
+            Map<String, Object> response = (Map<String, Object>) restTemplate.postForObject(endpoint, entity,
+                    Map.class);
 
             if (response == null) {
                 throw new BadRequestException("Ollama returned an empty response.");
@@ -209,7 +210,6 @@ public class AiQuizService {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private JsonNode fetchOllamaModels() {
         String endpoint = ollamaBaseUrl + OLLAMA_TAGS_PATH;
         String responseBody = restTemplate.getForObject(endpoint, String.class);
@@ -250,41 +250,39 @@ public class AiQuizService {
         return modelNames;
     }
 
-    
-
     private String buildPrompt(AiQuizGenerationRequest request, String documentContent) {
         String questionTypeJson = generateQuestionTypeJson(request);
 
-        return String.format("""
-                Based on the following document content, generate exactly %d quiz questions at %s difficulty level.
-                
-                Requirements:
-                - Generate questions in JSON format matching this structure:
-                %s
-                - Include a concise quiz description in the field named "description"
-                - Return exactly %d questions
-                - Do not return fewer or more questions than %d
-                - Use the field name "question" for the prompt text
-                - For MCQ questions, provide 4 distinct answers in answer1, answer2, answer3, answer4
-                - For MCQ questions, set correctAnswer to the key of the correct option: answer1, answer2, answer3, or answer4
-                - All questions must NEVER be empty and must be relevant to the document content
-                - Keep answers concise and accurate
-                - Make questions clear and educational
-                - Return ONLY valid JSON, no additional text or markdown formatting
-                
-                Document content:
-                %s
-                
-                Return ONLY valid JSON in this format:
-                {"title": "Quiz Title", "description": "Short quiz description", "questions": [...]}
-                """,
+        return String.format(
+                """
+                        Based on the following document content, generate exactly %d quiz questions at %s difficulty level.
+
+                        Requirements:
+                        - Generate questions in JSON format matching this structure:
+                        %s
+                        - Include a concise quiz description in the field named "description"
+                        - Return exactly %d questions
+                        - Do not return fewer or more questions than %d
+                        - Use the field name "question" for the prompt text
+                        - For MCQ questions, provide 4 distinct answers in answer1, answer2, answer3, answer4
+                        - For MCQ questions, set correctAnswer to the key of the correct option: answer1, answer2, answer3, or answer4
+                        - All questions must NEVER be empty and must be relevant to the document content
+                        - Keep answers concise and accurate
+                        - Make questions clear and educational
+                        - Return ONLY valid JSON, no additional text or markdown formatting
+
+                        Document content:
+                        %s
+
+                        Return ONLY valid JSON in this format:
+                        {"title": "Quiz Title", "description": "Short quiz description", "questions": [...]}
+                        """,
                 request.getNumberOfQuestions(),
                 request.getDifficulty().toLowerCase(),
                 questionTypeJson,
                 request.getNumberOfQuestions(),
                 request.getNumberOfQuestions(),
-                truncateContent(documentContent, 3000)
-        );
+                truncateContent(documentContent, 3000));
     }
 
     private String generateQuestionTypeJson(AiQuizGenerationRequest request) {
@@ -432,8 +430,7 @@ public class AiQuizService {
                 question.getAnswer1(),
                 question.getAnswer2(),
                 question.getAnswer3(),
-                question.getAnswer4()
-        );
+                question.getAnswer4());
 
         for (int index = 0; index < choices.size(); index++) {
             if (normalize(choices.get(index)).equals(correctAnswer)) {

@@ -35,7 +35,7 @@ export default function Register() {
 
       // BACKEND API
       const response = await fetch(
-        "http://localhost:8080/api/auth/register",
+        `http://${window.location.hostname}:8080/api/auth/register`,
         {
           method: "POST",
           headers: {
@@ -64,15 +64,14 @@ export default function Register() {
         data
       );
 
-      // Save token/user if backend returns it
-      localStorage.setItem(
-        "token",
-        data.token
-      );
-
+      // Save user manually
       localStorage.setItem(
         "user",
-        JSON.stringify(data.user)
+        JSON.stringify({
+          id: data.id,
+          email: data.email,
+          fullName: data.name,
+        })
       );
 
       // Redirect

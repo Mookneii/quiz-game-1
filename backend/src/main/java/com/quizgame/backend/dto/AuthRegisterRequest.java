@@ -1,7 +1,7 @@
 package com.quizgame.backend.dto;
 
 public class AuthRegisterRequest {
-
+    
     private String name;
     private String email;
     private String password;

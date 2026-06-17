@@ -31,7 +31,8 @@ public class QuizService {
         this.userRepository = userRepository;
     }
 
-    @Transactional // ⚡ CRITICAL FIX: Bundles all nested question/choice inserts into ONE database write operation
+    @Transactional // ⚡ CRITICAL FIX: Bundles all nested question/choice inserts into ONE database
+                   // write operation
     public QuizResponseDTO createQuiz(QuizRequestDTO request) {
         if (request.getCreatorId() == null) {
             throw new RuntimeException("CreatorId is required");
@@ -50,41 +51,74 @@ public class QuizService {
         return toDTO(savedQuiz);
     }
 
-    @Transactional
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<QuizResponseDTO> getAllQuizzes() {
-        List<Quiz> quizzes = quizRepository.findAll();
-        Collections.reverse(quizzes); 
-        return quizzes.stream().map(this::toDTO).collect(Collectors.toList());
+        return quizRepository.findAll()
+                .stream()
+                .map(quiz -> new QuizResponseDTO(
+                        quiz.getId(),
+                        quiz.getTitle(),
+                        quiz.getDescription(),
+                        quiz.getQuestions() != null ? quiz.getQuestions().size() : 0))
+                .collect(Collectors.toList());
     }
 
     @Transactional
     public QuizResponseDTO getQuizById(Long id) {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
-        return toDTO(quiz);
+
+        List<QuestionRequestDTO> questionDTOs = quiz.getQuestions().stream().map(q -> {
+            QuestionRequestDTO qDto = new QuestionRequestDTO();
+            qDto.setQuestionText(q.getQuestionText());
+            qDto.setTimeLimit(q.getTimeLimit());
+            qDto.setDifficulty(q.getDifficulty());
+
+            List<ChoiceRequestDTO> cDtos = q.getChoices().stream().map(c -> {
+                ChoiceRequestDTO cDto = new ChoiceRequestDTO();
+                cDto.setChoiceText(c.getChoiceText());
+                cDto.setIsCorrect(c.getIsCorrect());
+                return cDto;
+            }).collect(Collectors.toList());
+
+            qDto.setChoices(cDtos);
+            return qDto;
+        }).collect(Collectors.toList());
+
+        return new QuizResponseDTO(
+                quiz.getId(),
+                quiz.getTitle(),
+                quiz.getDescription(),
+                questionDTOs);
     }
 
-    @Transactional // ⚡ CRITICAL FIX: Clears old data and saves new sets inside a single, fast transaction block
     public QuizResponseDTO updateQuiz(Long id, QuizRequestDTO request) {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
 
-        if (request.getTitle() != null) quiz.setTitle(request.getTitle());
-        if (request.getDescription() != null) quiz.setDescription(request.getDescription());
-
-        // Replace all questions safely
+        if (request.getTitle() != null) {
+            quiz.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            quiz.setDescription(request.getDescription());
+        }
         if (request.getQuestions() != null) {
-            quiz.getQuestions().clear();
-            
-            // Avoid intermediate flushes if possible; clear paired with orphaning handles cleanup on commit.
-            List<Question> newQuestions = mapQuestions(request, quiz);
-            quiz.getQuestions().addAll(newQuestions);
+            if (quiz.getQuestions() != null) {
+                quiz.getQuestions().clear();
+                quiz.getQuestions().addAll(mapQuestions(request, quiz));
+            } else {
+                quiz.setQuestions(mapQuestions(request, quiz));
+            }
         }
 
-        return toDTO(quizRepository.save(quiz));
+        Quiz savedQuiz = quizRepository.save(quiz);
+
+        return new QuizResponseDTO(
+                savedQuiz.getId(),
+                savedQuiz.getTitle(),
+                savedQuiz.getDescription());
     }
 
-    @Transactional // Good practice to wrap deletes too
     public void deleteQuiz(Long id) {
         quizRepository.deleteById(id);
     }
@@ -125,13 +159,13 @@ public class QuizService {
                 quiz.getTitle(),
                 quiz.getDescription(),
                 questionDTOs.size(),
-                questionDTOs
-        );
+                questionDTOs);
     }
 
     private List<Question> mapQuestions(QuizRequestDTO request, Quiz quiz) {
         List<QuestionRequestDTO> questionRequests = request.getQuestions();
-        if (questionRequests == null || questionRequests.isEmpty()) return new ArrayList<>();
+        if (questionRequests == null || questionRequests.isEmpty())
+            return new ArrayList<>();
 
         List<Question> questions = new ArrayList<>();
         for (QuestionRequestDTO qr : questionRequests) {
@@ -148,7 +182,8 @@ public class QuizService {
 
     private List<Choice> mapChoices(QuestionRequestDTO questionRequest, Question question) {
         List<ChoiceRequestDTO> choiceRequests = questionRequest.getChoices();
-        if (choiceRequests == null || choiceRequests.isEmpty()) return new ArrayList<>();
+        if (choiceRequests == null || choiceRequests.isEmpty())
+            return new ArrayList<>();
 
         int correctChoiceIndex = resolveCorrectChoiceIndex(questionRequest);
         if (correctChoiceIndex == -1) {
@@ -167,30 +202,52 @@ public class QuizService {
         return choices;
     }
 
-    private int resolveCorrectChoiceIndex(QuestionRequestDTO qr) {
-        List<ChoiceRequestDTO> choices = qr.getChoices();
-        if (choices == null || choices.isEmpty()) return -1;
+    private int resolveCorrectChoiceIndex(QuestionRequestDTO questionRequest) {
+        List<ChoiceRequestDTO> choiceRequests = questionRequest.getChoices();
+        if (choiceRequests == null || choiceRequests.isEmpty()) {
+            return -1;
+        }
 
-        Integer selected = qr.getCorrectChoiceIndex();
-        if (selected != null && selected >= 0 && selected < choices.size()) return selected;
+        // Prefer an explicit index provided by the client (user selection).
+        Integer selectedIndex = questionRequest.getCorrectChoiceIndex();
+        if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < choiceRequests.size()) {
+            return selectedIndex;
+        }
 
-        String correct = normalize(qr.getCorrectAnswer());
-        if (correct.isEmpty()) return choices.size() == 1 ? 0 : -1;
+        // Check if any choice has isCorrect = true
+        for (int i = 0; i < choiceRequests.size(); i++) {
+            if (Boolean.TRUE.equals(choiceRequests.get(i).getIsCorrect())) {
+                return i;
+            }
+        }
 
-        if (correct.length() == 1 && correct.charAt(0) >= 'a') {
-            int idx = correct.charAt(0) - 'a';
-            if (idx >= 0 && idx < choices.size()) return idx;
+        // Otherwise, attempt to resolve from the AI-provided correctAnswer text on the
+        // server.
+        String correctAnswer = normalize(questionRequest.getCorrectAnswer());
+        if (correctAnswer.isEmpty()) {
+            return choiceRequests.size() == 1 ? 0 : -1;
+        }
+
+        // handle letter aliases like 'a', 'b', ...
+        if (correctAnswer.length() == 1 && correctAnswer.charAt(0) >= 'a' && correctAnswer.charAt(0) <= 'z') {
+            int aliasIndex = correctAnswer.charAt(0) - 'a';
+            if (aliasIndex >= 0 && aliasIndex < choiceRequests.size()) {
+                return aliasIndex;
+            }
         }
 
         if (correct.startsWith("answer") && correct.length() > 6) {
             try {
                 int idx = Integer.parseInt(correct.substring(6)) - 1;
-                if (idx >= 0 && idx < choices.size()) return idx;
-            } catch (NumberFormatException ignored) {}
+                if (idx >= 0 && idx < choices.size())
+                    return idx;
+            } catch (NumberFormatException ignored) {
+            }
         }
 
         for (int i = 0; i < choices.size(); i++) {
-            if (normalize(choices.get(i).getChoiceText()).equals(correct)) return i;
+            if (normalize(choices.get(i).getChoiceText()).equals(correct))
+                return i;
         }
 
         return choices.size() == 1 ? 0 : -1;
