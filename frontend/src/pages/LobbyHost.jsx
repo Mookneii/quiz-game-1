@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import api from '../api/http'
 import { createStompClient } from '../api/websocket'
+import Navbar_res from '../components/Navbar_res'
 
 // Creates a circular SVG avatar image using the player's initials and a gradient color.
 // 'name' is used to extract initials; 'from' and 'to' are the gradient start/end colors.
@@ -154,21 +155,7 @@ function LobbyHost() {
 		<div className="min-h-screen bg-white text-slate-900">
 			<div className="mx-auto flex min-h-screen max-w-7xl flex-col px-5 py-4 sm:px-8 lg:px-10">
 				{/* Top header: QuizUp logo on the left, Game PIN badge on the right */}
-				<header className="flex items-center justify-between gap-4">
-					<Link to="/" className="flex items-center gap-2">
-						<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 text-sm font-black text-white shadow-sm shadow-emerald-200">
-							Q
-						</div>
-						<span className="text-2xl font-extrabold tracking-tight text-emerald-500">
-							QuizUp
-						</span>
-					</Link>
-
-					{/* Displays the game PIN so the host can share it with players */}
-					<div className="rounded-full bg-linear-to-r from-violet-100 to-fuchsia-100 px-5 py-2 text-sm font-semibold text-emerald-500 shadow-sm shadow-slate-200">
-						Game PIN: {gamePin}
-					</div>
-				</header>
+				<Navbar_res pin={gamePin} />
 
 				<main className="flex flex-1 flex-col justify-center pb-24 pt-10">
 					<div className="max-w-5xl">

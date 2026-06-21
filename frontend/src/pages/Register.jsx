@@ -35,7 +35,7 @@ export default function Register() {
 
       // BACKEND API
       const response = await fetch(
-        "http://localhost:8080/api/auth/register",
+        "https://quizgame-backend-production-5fa0.up.railway.app/api/auth/register",
         {
           method: "POST",
           headers: {

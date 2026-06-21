@@ -25,7 +25,7 @@ export default function JoinGame() {
 
       // API CALL
       const response = await fetch(
-        "http://localhost:8080/api/rooms/join",
+        "https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/join",
         {
           method: "POST",
           headers: {

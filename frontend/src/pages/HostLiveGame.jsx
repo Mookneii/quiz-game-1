@@ -109,7 +109,7 @@ function HostLiveGame() {
 		// Fetches room details and quiz validation, then sets up the WebSocket subscription
 		const initializeRoom = async () => {
 			try {
-				const response = await fetch(`http://localhost:8080/api/rooms/${gamePin}`)
+				const response = await fetch(`https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${gamePin}`)
 				if (!response.ok) {
 					return
 				}
@@ -125,7 +125,7 @@ function HostLiveGame() {
 				// Validate that the linked quiz actually has questions before connecting
 				if (data.quizId) {
 					const quizResponse = await fetch(
-						`http://localhost:8080/api/quizzes/${data.quizId}`
+						`https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes/${data.quizId}`
 					)
 					if (quizResponse.ok) {
 						const quizData = await quizResponse.json()
