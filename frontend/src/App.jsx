@@ -25,7 +25,7 @@ export default function App() {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/features" element={<Features />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/JoinGame" element={<JoinGame/>} />
+        <Route path="/JoinGame" element={<JoinGame />} />
         <Route path="/lobby" element={<LobbyPlayer />} />
         <Route path="/lobby/:pin" element={<LobbyPlayer />} />
         <Route path="/lobby-host" element={<LobbyHost />} />
@@ -42,6 +42,7 @@ export default function App() {
         <Route path="/create-quiz" element={<CreateQuiz />} />
         <Route path="/create-quiz/:quizId" element={<CreateQuiz />} />
         <Route path="/edit-quiz/:quizId" element={<EditQuiz />} />
+        <Route path="/join/:roomCode" element={<JoinGame />} />
       </Routes>
     </BrowserRouter>
   );

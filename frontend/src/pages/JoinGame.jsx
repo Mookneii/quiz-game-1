@@ -1,20 +1,26 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 
 export default function JoinGame() {
+  const navigate = useNavigate();
+  const { roomCode } = useParams();
+
   const [pin, setPin] = useState("");
   const [nickname, setNickname] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const navigate = useNavigate();
+  useEffect(() => {
+    if (roomCode) {
+      setPin(roomCode);
+    }
+  }, [roomCode]);
 
   const handleJoin = async (e) => {
     e.preventDefault();
 
     setError("");
 
-    // Validation
     if (!pin || !nickname) {
       setError("Please fill all fields");
       return;
@@ -23,7 +29,6 @@ export default function JoinGame() {
     try {
       setLoading(true);
 
-      // API CALL
       const response = await fetch(
         "https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/join",
         {
@@ -35,19 +40,15 @@ export default function JoinGame() {
             roomCode: pin,
             nickname: nickname,
           }),
-        }
+        },
       );
 
-      // Error handling
       if (!response.ok) {
         throw new Error("Failed to join room");
       }
 
       const data = await response.json();
 
-      console.log("Joined room:", data);
-
-      // Navigate to lobby page
       navigate(`/lobby/${pin}`, {
         state: {
           nickname,
@@ -73,9 +74,8 @@ export default function JoinGame() {
           {/* LEFT CARD */}
           <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md mx-auto w-full">
             {/* Icon */}
-            
+
             <div className="flex justify-center mb-6">
-              
               <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
                 Q
               </div>
@@ -87,14 +87,13 @@ export default function JoinGame() {
             </h1>
 
             <p className="text-gray-500 text-center mt-4 leading-7">
-              Enter the game PIN provided by your host
+              {roomCode
+                ? `Joining room ${roomCode}`
+                : "Enter the game PIN provided by your host"}
             </p>
 
             {/* FORM */}
-            <form
-              onSubmit={handleJoin}
-              className="mt-10 space-y-6"
-            >
+            <form onSubmit={handleJoin} className="mt-10 space-y-6">
               {/* PIN */}
               <div>
                 <label className="block text-sm font-semibold text-green-500 mb-2">
@@ -105,9 +104,8 @@ export default function JoinGame() {
                   type="text"
                   placeholder="Enter 6-digit PIN"
                   value={pin}
-                  onChange={(e) =>
-                    setPin(e.target.value)
-                  }
+                  readOnly={!!roomCode}
+                  onChange={(e) => setPin(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-5 py-4 outline-none focus:ring-2 focus:ring-green-400 text-center text-lg"
                 />
               </div>
@@ -122,18 +120,14 @@ export default function JoinGame() {
                   type="text"
                   placeholder="Enter your nickname"
                   value={nickname}
-                  onChange={(e) =>
-                    setNickname(e.target.value)
-                  }
+                  onChange={(e) => setNickname(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl px-5 py-4 outline-none focus:ring-2 focus:ring-green-400"
                 />
               </div>
 
               {/* Error Message */}
               {error && (
-                <p className="text-red-500 text-sm text-center">
-                  {error}
-                </p>
+                <p className="text-red-500 text-sm text-center">{error}</p>
               )}
 
               {/* Button */}
@@ -142,16 +136,13 @@ export default function JoinGame() {
                 disabled={loading}
                 className="w-full bg-green-500 hover:bg-green-600 transition text-white font-semibold py-4 rounded-xl shadow-md hover:scale-[1.02] disabled:opacity-50"
               >
-                {loading
-                  ? "Joining..."
-                  : "Join Game"}
+                {loading ? "Joining..." : "Join Game"}
               </button>
             </form>
 
             {/* Footer text */}
             <p className="text-gray-400 text-sm text-center mt-8">
-              Don’t have a PIN? Ask your host to
-              start a new game
+              Don’t have a PIN? Ask your host to start a new game
             </p>
           </div>
 
