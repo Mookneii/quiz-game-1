@@ -9,6 +9,9 @@ public class AnswerResultDTO {
     private Integer streak;
     private Integer questionIndex;
     private Integer totalQuestions;
+    private String questionText;
+    private String selectedAnswer;
+    private Boolean isCorrect;
 
     public AnswerResultDTO() {}
 
@@ -20,6 +23,12 @@ public class AnswerResultDTO {
         this.streak = streak;
         this.questionIndex = questionIndex;
         this.totalQuestions = totalQuestions;
+    }
+
+    public AnswerResultDTO(String questionText, String selectedAnswer, Boolean isCorrect) {
+        this.questionText = questionText;
+        this.selectedAnswer = selectedAnswer;
+        this.isCorrect = isCorrect;
     }
 
     public Long getPlayerId() {
@@ -76,5 +85,29 @@ public class AnswerResultDTO {
 
     public void setTotalQuestions(Integer totalQuestions) {
         this.totalQuestions = totalQuestions;
+    }
+
+    public String getQuestionText() {
+        return questionText;
+    }
+
+    public void setQuestionText(String questionText) {
+        this.questionText = questionText;
+    }
+
+    public String getSelectedAnswer() {
+        return selectedAnswer;
+    }
+
+    public void setSelectedAnswer(String selectedAnswer) {
+        this.selectedAnswer = selectedAnswer;
+    }
+
+    public Boolean getIsCorrect() {
+        return isCorrect;
+    }
+
+    public void setIsCorrect(Boolean isCorrect) {
+        this.isCorrect = isCorrect;
     }
 }
