@@ -10,6 +10,9 @@ import com.quizgame.backend.model.Quiz;
 import com.quizgame.backend.model.User;
 import com.quizgame.backend.repository.QuizRepository;
 import com.quizgame.backend.repository.UserRepository;
+
+import jakarta.persistence.ManyToOne;
+
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,16 +22,24 @@ import java.util.stream.Collectors;
 
 @Service
 public class QuizService {
-
+    @ManyToOne
+    private User creator;
     private final QuizRepository quizRepository;
     private final UserRepository userRepository;
 
     public QuizService(
             QuizRepository quizRepository,
-            UserRepository userRepository
-    ) {
+            UserRepository userRepository) {
         this.quizRepository = quizRepository;
         this.userRepository = userRepository;
+    }
+
+    public boolean isQuizOwner(Long quizId, Long userId) {
+
+        Quiz quiz = quizRepository.findById(quizId)
+                .orElseThrow(() -> new RuntimeException("Quiz not found"));
+
+        return quiz.getCreator().getId().equals(userId);
     }
 
     public QuizResponseDTO createQuiz(QuizRequestDTO request) {
@@ -50,8 +61,7 @@ public class QuizService {
         return new QuizResponseDTO(
                 savedQuiz.getId(),
                 savedQuiz.getTitle(),
-                savedQuiz.getDescription()
-        );
+                savedQuiz.getDescription());
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
@@ -62,8 +72,7 @@ public class QuizService {
                         quiz.getId(),
                         quiz.getTitle(),
                         quiz.getDescription(),
-                        quiz.getQuestions() != null ? quiz.getQuestions().size() : 0
-                ))
+                        quiz.getQuestions() != null ? quiz.getQuestions().size() : 0))
                 .collect(Collectors.toList());
     }
 
@@ -76,14 +85,14 @@ public class QuizService {
             qDto.setQuestionText(q.getQuestionText());
             qDto.setTimeLimit(q.getTimeLimit());
             qDto.setDifficulty(q.getDifficulty());
-            
+
             List<ChoiceRequestDTO> cDtos = q.getChoices().stream().map(c -> {
                 ChoiceRequestDTO cDto = new ChoiceRequestDTO();
                 cDto.setChoiceText(c.getChoiceText());
                 cDto.setIsCorrect(c.getIsCorrect());
                 return cDto;
             }).collect(Collectors.toList());
-            
+
             qDto.setChoices(cDtos);
             return qDto;
         }).collect(Collectors.toList());
@@ -92,8 +101,7 @@ public class QuizService {
                 quiz.getId(),
                 quiz.getTitle(),
                 quiz.getDescription(),
-                questionDTOs
-        );
+                questionDTOs);
     }
 
     public QuizResponseDTO updateQuiz(Long id, QuizRequestDTO request) {
@@ -120,8 +128,7 @@ public class QuizService {
         return new QuizResponseDTO(
                 savedQuiz.getId(),
                 savedQuiz.getTitle(),
-                savedQuiz.getDescription()
-        );
+                savedQuiz.getDescription());
     }
 
     public void deleteQuiz(Long id) {
@@ -156,9 +163,10 @@ public class QuizService {
 
         List<Choice> choices = new ArrayList<>();
         int correctChoiceIndex = resolveCorrectChoiceIndex(questionRequest);
-            if (correctChoiceIndex == -1) {
-                throw new IllegalArgumentException("Ambiguous correct choice for question: '" + questionRequest.getQuestionText() + "'. Please select the correct option before saving.");
-            }
+        if (correctChoiceIndex == -1) {
+            throw new IllegalArgumentException("Ambiguous correct choice for question: '"
+                    + questionRequest.getQuestionText() + "'. Please select the correct option before saving.");
+        }
         for (int index = 0; index < choiceRequests.size(); index++) {
             ChoiceRequestDTO choiceRequest = choiceRequests.get(index);
             Choice choice = new Choice();
@@ -190,7 +198,8 @@ public class QuizService {
             }
         }
 
-        // Otherwise, attempt to resolve from the AI-provided correctAnswer text on the server.
+        // Otherwise, attempt to resolve from the AI-provided correctAnswer text on the
+        // server.
         String correctAnswer = normalize(questionRequest.getCorrectAnswer());
         if (correctAnswer.isEmpty()) {
             return choiceRequests.size() == 1 ? 0 : -1;
@@ -230,4 +239,4 @@ public class QuizService {
 
         return value.trim().toLowerCase(Locale.ROOT);
     }
-} 
+}

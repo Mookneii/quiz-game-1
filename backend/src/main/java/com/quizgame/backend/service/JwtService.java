@@ -29,7 +29,7 @@ public class JwtService {
                                 .expiration(
                                                 new Date(
                                                                 System.currentTimeMillis()
-                                                                                + 1000 * 60 * 60 * 24))
+                                                                                + 1000 * 60 * 60 * 24)) // 24 hours
                                 .signWith(key)
                                 .compact();
         }
@@ -63,5 +63,12 @@ public class JwtService {
                         e.printStackTrace();
                         return false;
                 }
+        }
+
+        public Long extractUserId(String token) {
+
+                Claims claims = extractAllClaims(token);
+
+                return ((Number) claims.get("id")).longValue();
         }
 }
