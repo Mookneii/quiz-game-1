@@ -87,7 +87,7 @@ const LeaderboardPage = () => {
 
 				// Call backend leaderboard API
 				const response = await fetch(
-					`https://quizgame-backend-production-5fa0.up.railway.app/api/games/${roomCode}/results`
+					`http://${window.location.hostname}:8080/api/games/${roomCode}/results`
 				)
 
 				if (response.ok) {
@@ -278,7 +278,7 @@ function ReviewSection({ roomCode }) {
 
 				// Step 1: get room details
 				const roomResponse = await fetch(
-					`https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${roomCode}`
+					`http://${window.location.hostname}:8080/api/rooms/${roomCode}`
 				)
 
 				if (!roomResponse.ok) return
@@ -289,7 +289,7 @@ function ReviewSection({ roomCode }) {
 
 				// Step 2: get quiz details
 				const quizResponse = await fetch(
-					`https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes/${quizId}`
+					`http://${window.location.hostname}:8080/api/quizzes/${quizId}`
 				)
 
 				if (!quizResponse.ok) return

@@ -178,19 +178,7 @@ function GameRoom() {
     // Prevent duplicate submission
     if (!question || selectedIndex !== null) return
 
-    try {
-      await api.post('/api/games/answer', {
-        roomCode: gamePin,
-        playerId,
-        questionId: question.id,
-        choiceId: -1, // -1 = no answer selected
-        timeTakenMs: (question.timeLimit || 0) * 1000,
-      })
-    } catch (err) {
-      console.error('Auto-submit error:', err)
-    }
-
-    // Navigate to waiting screen
+    // Navigate to waiting screen, carrying the result
     navigate('/waiting', {
       replace: true,
       state: {
@@ -198,6 +186,10 @@ function GameRoom() {
         playerId,
         nickname,
         selectedIndex: null,
+        questionId: question.id,
+        choiceId: -1,
+        timeTakenMs: (question.timeLimit || 0) * 1000,
+        answerResult: null,
       },
     })
   }
@@ -216,32 +208,20 @@ function GameRoom() {
     // Calculate response time
     const timeTakenMs = Date.now() - startTimeRef.current
 
-    try {
-      await api.post('/api/games/answer', {
-        roomCode: gamePin,
+    // Go to waiting screen instantly, carry data so WaitingAnswer can submit it
+    navigate('/waiting', {
+      replace: true,
+      state: {
+        pin: gamePin,
         playerId,
+        nickname,
+        selectedIndex: index,
         questionId: question.id,
         choiceId,
         timeTakenMs,
-      })
-
-      // Go to waiting screen after submitting answer
-      navigate('/waiting', {
-        replace: true,
-        state: {
-          pin: gamePin,
-          playerId,
-          nickname,
-          selectedIndex: index,
-        },
-      })
-
-    } catch (err) {
-      console.error('Answer submit error:', err)
-
-      // Reset selection if request fails
-      setSelectedIndex(null)
-    }
+        answerResult: null,
+      },
+    })
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -286,6 +266,12 @@ function GameRoom() {
           {/* Game PIN */}
           <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
             PIN: {gamePin}
+          </div>
+
+          {/* Total Score */}
+          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70 flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-300 text-yellow-700 text-xs">★</span>
+            {localStorage.getItem('quiz-total-points') || 0}
           </div>
 
           {/* Player name */}

@@ -47,8 +47,28 @@ function LobbyHost() {
   const gamePin =
     params.pin || locationState.pin || locationState.roomCode || "123456";
 
-  const joinUrl = `${window.location.origin}/join/${gamePin}`;
+  // Use the local network IP if available (injected via Vite) so other devices can scan the QR code
+  const getBaseUrl = () => {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      // eslint-disable-next-line no-undef
+      const localIp = typeof __LOCAL_IP__ !== "undefined" ? __LOCAL_IP__ : window.location.hostname;
+      return `http://${localIp}:${window.location.port || "5173"}`;
+    }
+    return window.location.origin;
+  };
+
+  const joinUrl = `${getBaseUrl()}/join/${gamePin}`;
   const [copied, setCopied] = useState(false);
+
+  const copyLink = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(joinUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      alert("Copying to clipboard is not supported in this browser. Please manually select and copy the link below.");
+    }
+  };
 
   // True while the start-game API call is in progress (disables the Start button)
   const [isStarting, setIsStarting] = useState(false);
@@ -94,13 +114,14 @@ function LobbyHost() {
 
     loadRoom();
 
-    // Create a STOMP WebSocket client and subscribe to the room topic
-    const client = createStompClient();
-    client.onConnect = () => {
-      client.subscribe(`/topic/room/${gamePin}`, (message) => {
-        try {
-          const event = JSON.parse(message.body);
-          const payload = event.data ?? event.payload ?? {};
+
+		//updating the screen for new player to join into the room
+		const client = createStompClient()
+		client.onConnect = () => {
+			client.subscribe(`/topic/room/${gamePin}`, (message) => {
+				try {
+					const event = JSON.parse(message.body)
+					const payload = event.data ?? event.payload ?? {};
 
           if (event.type === "PLAYER_JOINED") {
             // A new player joined — update the list with the server's full player array
@@ -117,34 +138,22 @@ function LobbyHost() {
 
     client.activate();
 
-    // Disconnect WebSocket when the component unmounts
-    return () => {
-      client.deactivate();
-    };
-  }, [gamePin]);
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(joinUrl);
+		// Disconnect WebSocket when the component unmounts
+		return () => {
+			client.deactivate()
+		}
+	}, [gamePin])
 
-      setCopied(true);
-
-      setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-  // Called when the host clicks the "Start" button.
-  // Posts a start-game request to the server, then navigates to the live game screen.
-  const handleStartGame = async () => {
-    setStartError("");
-    setIsStarting(true);
-
-    try {
-      await api.post("/api/games/start", {
-        roomCode: gamePin,
-      });
+	// Called when the host clicks the "Start" button.
+	// Posts a start-game request to the server, then navigates to the live game screen.
+	const handleStartGame = async () => {
+		setStartError('')
+		setIsStarting(true)
+		try {
+			//sending the request to the server to start the game
+			await api.post('/api/games/start', {
+				roomCode: gamePin,
+			})
 
       // Navigate to the host's live game page, passing game info via state
       navigate(`/host-live-game/${gamePin}`, {
@@ -197,25 +206,20 @@ function LobbyHost() {
                 {players.map((player) => {
                   const isCurrentUser = false;
 
-                  return (
-                    <div
-                      key={player.id}
-                      className={`flex items-center justify-between rounded-2xl px-4 py-3 transition ${
-                        isCurrentUser
-                          ? "border border-violet-200 bg-violet-50/70 shadow-[0_8px_20px_rgba(168,85,247,0.08)]"
-                          : "border border-transparent bg-slate-50/80"
-                      }`}
-                    >
-                      <div className="flex min-w-0 items-center gap-4">
-                        <img
-                          src={createAvatar(
-                            player.nickname || player.name || "User",
-                            "#ff7a59",
-                            "#ff4d8d",
-                          )}
-                          alt={`${player.nickname || player.name} avatar`}
-                          className="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm"
-                        />
+									return (
+										<div
+											key={player.id}
+											className={`flex items-center justify-between rounded-2xl px-4 py-3 transition ${isCurrentUser
+													? 'border border-violet-200 bg-violet-50/70 shadow-[0_8px_20px_rgba(168,85,247,0.08)]'
+													: 'border border-transparent bg-slate-50/80'
+												}`}
+										>
+											<div className="flex min-w-0 items-center gap-4">
+												<img
+													src={createAvatar(player.nickname || player.name || 'User', '#ff7a59', '#ff4d8d')}
+													alt={`${player.nickname || player.name} avatar`}
+													className="h-11 w-11 rounded-full object-cover ring-2 ring-white shadow-sm"
+												/>
 
                         <div className="min-w-0">
                           <p className="truncate text-base font-semibold text-slate-800">

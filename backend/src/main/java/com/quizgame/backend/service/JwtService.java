@@ -29,7 +29,7 @@ public class JwtService {
                                 .expiration(
                                                 new Date(
                                                                 System.currentTimeMillis()
-                                                                                + 1000 * 30 ))
+                                                                                + 1000 * 60 * 60 * 24))
                                 .signWith(key)
                                 .compact();
         }

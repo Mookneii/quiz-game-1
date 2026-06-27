@@ -92,7 +92,7 @@ function HostLiveGame() {
 	const totalPlayers = players.filter(p => !p.host).length
 	const answeredCount = answeredPlayers.length
 	const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
-	
+
 	// True when the host is on the final question (hides the "Next Question" button)
 	const isLastQuestion = questionIndex != null && totalQuestions != null && questionIndex + 1 >= totalQuestions
 
@@ -109,7 +109,7 @@ function HostLiveGame() {
 		// Fetches room details and quiz validation, then sets up the WebSocket subscription
 		const initializeRoom = async () => {
 			try {
-				const response = await fetch(`https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${gamePin}`)
+				const response = await fetch(`http://${window.location.hostname}:8080/api/rooms/${gamePin}`)
 				if (!response.ok) {
 					return
 				}
@@ -125,7 +125,7 @@ function HostLiveGame() {
 				// Validate that the linked quiz actually has questions before connecting
 				if (data.quizId) {
 					const quizResponse = await fetch(
-						`https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes/${data.quizId}`
+						`http://${window.location.hostname}:8080/api/quizzes/${data.quizId}`
 					)
 					if (quizResponse.ok) {
 						const quizData = await quizResponse.json()
@@ -357,7 +357,7 @@ function HostLiveGame() {
 									? `Question ${questionIndex + 1} of ${totalQuestions}`
 									: 'Preparing first question...'}
 							</div>
-							
+
 							{/* Question Progress Bar — shows how far through the quiz the host is */}
 							{totalQuestions > 0 && (
 								<div className="h-1.5 w-64 overflow-hidden rounded-full bg-slate-200">
