@@ -64,6 +64,14 @@ public class QuizController {
                     "Token expired or invalid");
         }
 
+        Long userId = jwtService.extractUserId(token);
+
+        if (!quizService.isQuizOwner(id, userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You do not own this quiz");
+        }
+
         return quizService.updateQuiz(id, request);
     }
 
@@ -78,6 +86,14 @@ public class QuizController {
             throw new ResponseStatusException(
                     HttpStatus.UNAUTHORIZED,
                     "Token expired or invalid");
+        }
+
+        Long userId = jwtService.extractUserId(token);
+
+        if (!quizService.isQuizOwner(id, userId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You do not own this quiz");
         }
 
         quizService.deleteQuiz(id);
