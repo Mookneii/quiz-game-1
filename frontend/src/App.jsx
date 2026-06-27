@@ -16,8 +16,6 @@ import WaitingAnswer from "./pages/WaitingAnswer";
 import HostLiveGame from "./pages/HostLiveGame";
 import CreateQuiz from "./pages/CreateQuiz";
 import EditQuiz from "./pages/EditQuiz";
-import GameHistory from "./pages/GameHistory";
-import GameHistoryDetail from "./pages/GameHistoryDetail";
 
 export default function App() {
   return (
@@ -45,8 +43,6 @@ export default function App() {
         <Route path="/create-quiz/:quizId" element={<CreateQuiz />} />
         <Route path="/edit-quiz/:quizId" element={<EditQuiz />} />
         <Route path="/join/:roomCode" element={<JoinGame />} />
-        <Route path="/game-history" element={<GameHistory />} />
-        <Route path="/game-history/:gameResultId" element={<GameHistoryDetail />} />
       </Routes>
     </BrowserRouter>
   );
