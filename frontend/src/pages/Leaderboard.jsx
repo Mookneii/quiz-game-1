@@ -60,7 +60,7 @@ const LeaderboardPage = () => {
     const fetchResults = async () => {
       try {
         const res = await fetch(
-          `https://quizgame-backend-production-5fa0.up.railway.app/api/games/${roomCode}/results`
+          `http://${window.location.hostname}:8080/api/games/${roomCode}/results`
         )
         if (!res.ok) return
 
@@ -220,7 +220,7 @@ function ReviewSection({ roomCode }) {
       try {
         // 1. Get room → quizId
         const roomRes = await fetch(
-          `https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${roomCode}`
+          `http://${window.location.hostname}:8080/api/rooms/${roomCode}`
         )
         if (!roomRes.ok) return
         const { quizId } = await roomRes.json()
@@ -228,7 +228,7 @@ function ReviewSection({ roomCode }) {
 
         // 2. Get quiz → questions
         const quizRes = await fetch(
-          `https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes/${quizId}`
+          `http://${window.location.hostname}:8080/api/quizzes/${quizId}`
         )
         if (!quizRes.ok) return
         const { questions: qs = [] } = await quizRes.json()

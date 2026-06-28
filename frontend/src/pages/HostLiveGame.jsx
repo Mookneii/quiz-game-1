@@ -115,7 +115,7 @@ function HostLiveGame() {
     const initializeRoom = async () => {
       try {
         const res = await fetch(
-          `https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${gamePin}`
+          `http://${window.location.hostname}:8080/api/rooms/${gamePin}`
         )
         if (!res.ok || cancelled) return
 
@@ -124,7 +124,7 @@ function HostLiveGame() {
 
         if (data.quizId) {
           const quizRes = await fetch(
-            `https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes/${data.quizId}`
+            `http://${window.location.hostname}:8080/api/quizzes/${data.quizId}`
           )
           if (quizRes.ok) {
             const quizData = await quizRes.json()
