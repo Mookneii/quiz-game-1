@@ -57,7 +57,7 @@ export default function HostDashboard() {
       setLoading(true);
 
       const response = await fetch(
-        `http://${window.location.hostname}:8080/api/quizzes`,
+        `https://quizgame-backend-production-5fa0.up.railway.app/api/quizzes`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -110,7 +110,7 @@ export default function HostDashboard() {
   const handleHostRoom = async (quizId) => {
     try {
       const response = await fetch(
-        `http://${window.location.hostname}:8080/api/rooms`,
+        `https://quizgame-backend-production-5fa0.up.railway.app/api/rooms`,
         {
           method: "POST",
           headers: {

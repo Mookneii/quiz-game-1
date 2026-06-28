@@ -28,7 +28,7 @@ export default function Login() {
       setLoading(true);
 
       // API CALL
-      const response = await fetch(`http://${window.location.hostname}:8080/api/auth/login`, {
+      const response = await fetch(`https://quizgame-backend-production-5fa0.up.railway.app/api/auth/login`, {
         method: "POST",
 
         headers: {
