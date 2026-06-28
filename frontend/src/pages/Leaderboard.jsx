@@ -236,58 +236,31 @@ function ReviewSection({ roomCode, myPlayerId }) {
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
-        // 1. Get room → quizId
-        const roomRes = await fetch(
-          `http://${window.location.hostname}:8080/api/rooms/${roomCode}?t=${Date.now()}`
-        )
-        if (!roomRes.ok) return
-        const { quizId } = await roomRes.json()
-        if (!quizId) return
+        const cacheKey = `review_${roomCode}_${myPlayerId || 'host'}`
+        const cached = sessionStorage.getItem(cacheKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          setQuestions(parsed.questions)
+          setUserAnswers(parsed.userAnswers || {})
+          return
+        }
 
-        // 2. Fetch everything concurrently
-        const fetches = [
-          fetch(`http://${window.location.hostname}:8080/api/questions?t=${Date.now()}`),
-          fetch(`http://${window.location.hostname}:8080/api/choices?t=${Date.now()}`)
-        ]
-        
+        const url = new URL(`http://${window.location.hostname}:8080/api/games/${roomCode}/review`)
+        url.searchParams.append('t', Date.now())
         if (myPlayerId) {
-          fetches.push(fetch(`http://${window.location.hostname}:8080/api/answers?t=${Date.now()}`))
+          url.searchParams.append('playerId', myPlayerId)
         }
 
-        const responses = await Promise.all(fetches)
-        if (!responses[0].ok || !responses[1].ok) return
+        const res = await fetch(url.toString())
+        if (!res.ok) return
 
-        const allQuestions = await responses[0].json()
-        const allChoices = await responses[1].json()
+        const data = await res.json()
         
-        if (myPlayerId && responses[2] && responses[2].ok) {
-          const allAnswers = await responses[2].json()
-          const myAnswers = allAnswers.filter((a) => String(a.playerId) === String(myPlayerId))
-          const ansMap = {}
-          for (const a of myAnswers) {
-            ansMap[a.questionId] = a.choiceId
-          }
-          setUserAnswers(ansMap)
-        }
+        // Cache the result so switching tabs/reloading is instant
+        sessionStorage.setItem(cacheKey, JSON.stringify(data))
 
-        // Filter for this quiz
-        const myQs = allQuestions.filter(q => q.quizId === quizId)
-
-        // 3. Normalize into a simple shape and set state
-        setQuestions(
-          myQs.map((q) => {
-            const myChoices = allChoices.filter(c => c.questionId === q.id)
-            return {
-              id:      q.id,
-              text:    q.questionText,
-              choices: myChoices.map((c) => ({
-                id:        c.id,
-                text:      c.choiceText,
-                isCorrect: !!c.correct,
-              })),
-            }
-          })
-        )
+        setQuestions(data.questions)
+        setUserAnswers(data.userAnswers || {})
       } catch (err) {
         console.error('Review fetch error:', err)
       }
