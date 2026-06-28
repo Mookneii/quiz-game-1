@@ -99,10 +99,8 @@ function HostLiveGame() {
   const [answeredPlayers,     setAnsweredPlayers]     = useState([])
   const [nextQuestionLoading, setNextQuestionLoading] = useState(false)
   const [questionError,       setQuestionError]       = useState('')
-  const [timeLeft,            setTimeLeft]            = useState(null)
 
   const firstQuestionRequestedRef = useRef(false)
-  const endTimeRef = useRef(0)
 
   // ── Sync Question Index to SessionStorage ──────────────────────────────────
   useEffect(() => {
@@ -116,29 +114,6 @@ function HostLiveGame() {
   const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
   const progressPercent = totalQuestions > 0 ? Math.round(((questionIndex + 1) / totalQuestions) * 100) : 0
   const isLastQuestion  = questionIndex + 1 >= totalQuestions && totalQuestions > 0
-
-  // ── Timer Logic ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (timeLeft === null || timeLeft <= 0) return
-
-    const id = setInterval(() => {
-      setTimeLeft(() => {
-        const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000))
-        return remaining
-      })
-    }, 1000)
-
-    return () => clearInterval(id)
-  }, [timeLeft])
-
-  const timerColor =
-    timeLeft === null
-      ? 'bg-slate-700'
-      : timeLeft > (currentQuestion?.timeLimit ?? 30) * 0.5
-      ? 'bg-emerald-500'
-      : timeLeft > (currentQuestion?.timeLimit ?? 30) * 0.25
-      ? 'bg-yellow-500'
-      : 'bg-red-500'
 
   // ── WebSocket + initial fetch ──────────────────────────────────────────────
   useEffect(() => {
@@ -184,8 +159,6 @@ function HostLiveGame() {
                 setQuestionIndex(payload.questionIndex ?? 0)
                 setTotalQuestions(payload.totalQuestions ?? 0)
                 setAnsweredPlayers([])
-                setTimeLeft(q?.timeLimit ?? null)
-                endTimeRef.current = Date.now() + (q?.timeLimit || 0) * 1000
               } else if (event.type === 'ANSWER_RESULT') {
                 setAnsweredPlayers((prev) =>
                   prev.includes(payload.playerId) ? prev : [...prev, payload.playerId]
@@ -366,22 +339,13 @@ function HostLiveGame() {
 
           {/* Question text + choices — scrollable if too tall on small screens */}
           <div className="mt-4 flex flex-1 flex-col overflow-y-auto">
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <h1 className="flex-1 text-2xl font-black leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
-                {questionError
-                  ? questionError
-                  : currentQuestion
-                  ? currentQuestion.questionText
-                  : 'Preparing first question…'}
-              </h1>
-
-              {/* Countdown timer */}
-              {!questionError && currentQuestion && timeLeft !== null && (
-                <div className={`shrink-0 flex h-16 w-16 items-center justify-center rounded-full text-2xl font-black text-white shadow-lg sm:h-20 sm:w-20 sm:text-3xl ${timerColor}`}>
-                  {timeLeft}
-                </div>
-              )}
-            </div>
+            <h1 className="mb-6 text-2xl font-black leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+              {questionError
+                ? questionError
+                : currentQuestion
+                ? currentQuestion.questionText
+                : 'Preparing first question…'}
+            </h1>
 
             {!questionError && currentQuestion && (
               <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
