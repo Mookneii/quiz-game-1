@@ -267,10 +267,10 @@ function GameRoom() {
   // ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col">
+    <div className="h-screen bg-slate-900 flex flex-col overflow-hidden">
 
       {/* HEADER */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800 shadow-lg">
+      <header className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-4 bg-slate-800 shadow-lg flex-shrink-0">
 
         <div className="font-extrabold text-xl text-emerald-400">
           QuizUp
@@ -284,11 +284,6 @@ function GameRoom() {
               Q {questionIndex + 1} / {totalQuestions}
             </div>
           )}
-
-          {/* Game PIN */}
-          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
-            PIN: {gamePin}
-          </div>
 
           {/* Total Score */}
           <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70 flex items-center gap-2">
@@ -305,7 +300,7 @@ function GameRoom() {
       </header>
 
       {/* MAIN GAME AREA */}
-      <main className="flex-1 flex flex-col items-center justify-center p-6 gap-8 w-full max-w-5xl mx-auto">
+      <main className="flex-1 flex flex-col items-center justify-between p-4 sm:p-6 gap-3 sm:gap-8 w-full max-w-5xl mx-auto overflow-hidden">
 
         {/* If no question yet → waiting screen */}
         {!question ? (
@@ -318,15 +313,15 @@ function GameRoom() {
         ) : (
           <>
             {/* QUESTION + TIMER */}
-            <div className="w-full flex items-start justify-between gap-6">
+            <div className="w-full flex items-start justify-between gap-3 sm:gap-6 flex-shrink-0">
 
-              <h1 className="flex-1 text-3xl sm:text-4xl font-black text-white leading-tight">
+              <h1 className="flex-1 text-xl sm:text-3xl lg:text-4xl font-black text-white leading-tight">
                 {question.questionText}
               </h1>
 
               {/* Countdown timer */}
               {timeLeft !== null && (
-                <div className={`h-20 w-20 rounded-full flex items-center justify-center text-white text-4xl font-black ${timerColor}`}>
+                <div className={`h-12 w-12 sm:h-20 sm:w-20 flex-shrink-0 rounded-full flex items-center justify-center text-white text-2xl sm:text-4xl font-black ${timerColor}`}>
                   {timeLeft}
                 </div>
               )}
@@ -334,7 +329,7 @@ function GameRoom() {
             </div>
 
             {/* ANSWER OPTIONS */}
-            <div className="w-full grid grid-cols-2 gap-4">
+            <div className="w-full flex-1 grid grid-cols-2 gap-2 sm:gap-4 min-h-0">
 
               {choices.map((c, i) => {
                 const s = SHAPES[i % 4]
@@ -344,9 +339,9 @@ function GameRoom() {
                     key={c.id || i}
                     onClick={() => handleChoice(c.id, i)}
                     disabled={selectedIndex !== null || isTimeUp}
-                    className={`${s.bg} ${s.hover} rounded-2xl flex items-center justify-center text-white font-bold text-2xl p-6`}
+                    className={`${s.bg} ${s.hover} rounded-2xl flex items-center justify-center text-white font-bold text-base sm:text-2xl p-3 sm:p-6`}
                   >
-                    <span>{c.choiceText}</span>
+                    <span className="text-center leading-snug">{c.choiceText}</span>
                   </button>
                 )
               })}
