@@ -12,6 +12,8 @@ import com.quizgame.backend.model.User;
 import com.quizgame.backend.repository.QuizRepository;
 import com.quizgame.backend.repository.RoomRepository;
 import com.quizgame.backend.repository.UserRepository;
+import com.quizgame.backend.repository.GameResultRepository;
+import com.quizgame.backend.model.GameResult;
 
 import jakarta.persistence.ManyToOne;
 
@@ -29,14 +31,17 @@ public class QuizService {
     private final QuizRepository quizRepository;
     private final UserRepository userRepository;
     private final RoomRepository roomRepository;
+    private final GameResultRepository gameResultRepository;
 
     public QuizService(
             QuizRepository quizRepository,
             UserRepository userRepository,
-            RoomRepository roomRepository) {
+            RoomRepository roomRepository,
+            GameResultRepository gameResultRepository) {
         this.quizRepository = quizRepository;
         this.userRepository = userRepository;
         this.roomRepository = roomRepository;
+        this.gameResultRepository = gameResultRepository;
     }
 
     public boolean isQuizOwner(Long quizId, Long userId) {
@@ -125,6 +130,8 @@ public class QuizService {
                 List<Room> rooms = roomRepository.findByQuizId(id);
                 if (!rooms.isEmpty()) {
                     for (Room room : rooms) {
+                        List<GameResult> results = gameResultRepository.findByRoomId(room.getId());
+                        gameResultRepository.deleteAll(results);
                         room.setQuiz(null); // break reference
                     }
                     roomRepository.saveAll(rooms);
@@ -148,9 +155,14 @@ public class QuizService {
 
     public void deleteQuiz(Long id) {
         List<Room> rooms = roomRepository.findByQuizId(id);
-        for (Room room : rooms) {
-            room.setQuiz(null);
-            roomRepository.save(room);
+        if (!rooms.isEmpty()) {
+            for (Room room : rooms) {
+                List<GameResult> results = gameResultRepository.findByRoomId(room.getId());
+                gameResultRepository.deleteAll(results);
+                room.setQuiz(null);
+            }
+            roomRepository.saveAll(rooms);
+            roomRepository.deleteAll(rooms);
         }
         quizRepository.deleteById(id);
     }

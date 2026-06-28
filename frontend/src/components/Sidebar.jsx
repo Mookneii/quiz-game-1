@@ -85,7 +85,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
         <div className="p-4 border-t">
           <button
             onClick={handleLogout}
-            className="text-purple-400 flex items-center gap-3 px-4 py-3 hover:text-red-500 transition text-sm font-semibold"
+            className="text-purple-400 flex items-center w-full gap-3 px-4 py-3 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all hover:-translate-y-0.5 active:translate-y-0 text-sm font-semibold"
           >
             ↩ Logout
           </button>
