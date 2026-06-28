@@ -8,6 +8,7 @@ import com.quizgame.backend.dto.RoomCreateResponse;
 import com.quizgame.backend.dto.RoomDetailsResponse;
 import com.quizgame.backend.dto.RoomJoinRequest;
 import com.quizgame.backend.dto.RoomJoinResponse;
+import com.quizgame.backend.dto.RoomHistoryDTO;
 import com.quizgame.backend.exception.BadRequestException;
 import com.quizgame.backend.exception.NotFoundException;
 import com.quizgame.backend.model.Quiz;
@@ -155,6 +156,10 @@ public class RoomService {
                 room.getQuiz() != null ? room.getQuiz().getId() : null,
                 getPlayerDTOs(room.getId())
         );
+    }
+
+    public List<RoomHistoryDTO> getRoomHistory(Long hostId) {
+        return roomRepository.findRoomHistoryByHostId(hostId);
     }
 
     public void broadcastPlayerJoined(String roomCode, Long playerId) {

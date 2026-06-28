@@ -46,7 +46,7 @@ export default function App() {
         <Route path="/edit-quiz/:quizId" element={<EditQuiz />} />
         <Route path="/join/:roomCode" element={<JoinGame />} />
         <Route path="/game-history" element={<GameHistory />} />
-        <Route path="/game-history/:gameResultId" element={<GameHistoryDetail />} />
+        <Route path="/game-history/:roomCode" element={<GameHistoryDetail />} />
       </Routes>
     </BrowserRouter>
   );

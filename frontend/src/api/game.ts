@@ -12,8 +12,8 @@ export const submitAnswer = (gameId: string, answer: string) =>
 export const getUserGameHistory = (): Promise<GameHistory[]> =>
   api.get(`/api/game-history`);
 
-export const getGameHistoryDetail = (gameResultId: number): Promise<GameHistoryDetail> =>
-  api.get(`/api/game-history/${gameResultId}`);
+export const getGameResults = (roomCode: string) =>
+  api.get(`/api/games/${roomCode}/results`);
 
 export const deleteGameHistory = (gameResultId: number) =>
   api.delete(`/api/game-history/${gameResultId}`);

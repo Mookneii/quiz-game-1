@@ -78,6 +78,16 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
             >
               ➕ Create Quiz
             </button>
+            
+            <button
+              onClick={() => {
+                navigate("/game-history");
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-5 py-3 rounded-2xl font-semibold shadow-sm text-sm transition ${location.pathname.startsWith('/game-history') ? 'bg-emerald-500 text-white' : 'text-gray-700 hover:bg-white'}`}
+            >
+              📊 Game History
+            </button>
           </div>
         </div>
 

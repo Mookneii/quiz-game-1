@@ -68,9 +68,9 @@ export default function Home() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* LEFT SIDE */}
           <div>
-            <span className="inline-block bg-emerald-100 text-emerald-600 px-4 py-1 rounded-full text-sm font-medium mb-6">
+            {/* <span className="inline-block bg-emerald-100 text-emerald-600 px-4 py-1 rounded-full text-sm font-medium mb-6">
               New AI Quiz Generator
-            </span>
+            </span> */}
 
             <h1 className="text-5xl font-bold leading-tight mb-6">
               Make Learning

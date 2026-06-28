@@ -132,8 +132,8 @@ function GameRoom() {
           // GAME FINISHED
           // ─────────────────────────────────────────────
           else if (event.type === 'GAME_FINISHED') {
-            if (stompClientRef.current) {
-              stompClientRef.current.deactivate()
+            if (client) {
+              client.deactivate()
             }
             navigate('/leaderboard', { state: { pin: gamePin, playerId: playerId } })
           } 

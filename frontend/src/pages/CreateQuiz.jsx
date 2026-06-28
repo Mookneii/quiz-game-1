@@ -1,26 +1,19 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createQuiz } from "../api/quiz";
-import { ArrowLeft, Upload, Menu } from "lucide-react";
+import { ArrowLeft, Menu } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
-  const coverInputRef = useRef(null);
 
   const [quiz, setQuiz] = useState({
     title: "",
     description: "",
-    cover: null,
   });
   
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleCoverUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setQuiz({ ...quiz, cover: URL.createObjectURL(file) });
-  };
 
   const handleCreateQuiz = async () => {
     try {
@@ -53,9 +46,7 @@ export default function CreateQuiz() {
     }
   };
 
-  const coverBg = quiz.cover
-    ? "bg-cover bg-center"
-    : "bg-gradient-to-r from-indigo-500 to-emerald-500";
+
 
   return (
     <div className="min-h-screen bg-zinc-100 flex relative overflow-x-hidden">
@@ -112,29 +103,7 @@ export default function CreateQuiz() {
               />
             </div>
 
-            {/* COVER IMAGE */}
-            <div>
-              <label className="text-sm font-bold">Cover Image</label>
-              <div className="mt-3 border-2 border-dashed rounded-3xl p-6 sm:p-8 bg-white text-center">
-                <input
-                  hidden
-                  ref={coverInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCoverUpload}
-                />
-                <button
-                  onClick={() => coverInputRef.current.click()}
-                  className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 mx-auto text-sm sm:text-base hover:bg-emerald-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
-                >
-                  <Upload size={18} />
-                  Choose Cover
-                </button>
-                <p className="text-xs sm:text-sm text-zinc-500 mt-3">
-                  Upload cover image
-                </p>
-              </div>
-            </div>
+
 
             {/* SUBMIT */}
             <button
@@ -147,29 +116,47 @@ export default function CreateQuiz() {
         </div>
 
         {/* RIGHT: live preview — shown below form on mobile, beside on desktop */}
-        <div className="bg-white border-t lg:border-t-0 lg:border-l p-5 sm:p-6">
-          <div className="text-xs uppercase font-bold text-zinc-400">Live Preview</div>
+        <div className="bg-[#f5f7fb] border-t lg:border-t-0 lg:border-l p-5 sm:p-6 lg:p-10 flex flex-col justify-center items-center">
+          <div className="text-xs uppercase font-bold text-zinc-400 mb-8 self-start">Live Preview</div>
 
-          <div className="mt-4 border rounded-3xl overflow-hidden">
-            <div
-              className={`h-36 sm:h-44 ${coverBg}`}
-              style={{
-                backgroundImage: quiz.cover ? `url(${quiz.cover})` : "none",
-              }}
-            />
-
-            <div className="p-4 sm:p-5">
-              <h3 className="font-black text-xl sm:text-2xl break-words">
-                {quiz.title || "Quiz Title"}
-              </h3>
-              <p className="text-sm text-zinc-500 mt-2 break-words">
-                {quiz.description || "Quiz description preview"}
-              </p>
-              <div className="mt-4">
-                <span className="bg-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
-                  New Quiz
-                </span>
+          <div className="w-full max-w-sm bg-white rounded-3xl p-5 sm:p-7 border shadow-sm hover:shadow-xl transition">
+            {/* TOP */}
+            <div className="flex justify-between items-start mb-4 sm:mb-6">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-3xl">
+                📚
               </div>
+            </div>
+
+            {/* TITLE */}
+            <h3 className="text-lg sm:text-2xl font-bold text-gray-800 mb-3 break-words">
+              {quiz.title || "Quiz Title"}
+            </h3>
+
+            {/* INFO */}
+            <div className="flex flex-col gap-2 text-gray-500 text-sm mb-5 sm:mb-8">
+              <span className="break-words">📄 0 Questions</span>
+              <span className="break-words">🏷 General</span>
+              <span className="break-words">⏱ Just now</span>
+              {quiz.description && (
+                <span className="break-words mt-2 text-zinc-400 italic">"{quiz.description}"</span>
+              )}
+            </div>
+
+            {/* BUTTONS */}
+            <div className="flex gap-3">
+              <button
+                disabled
+                className="flex-1 bg-emerald-500 opacity-50 text-white py-2.5 sm:py-3 rounded-xl font-semibold transition text-sm cursor-not-allowed"
+              >
+                Open
+              </button>
+
+              <button
+                disabled
+                className="flex-1 border border-blue-500 opacity-50 text-blue-500 py-2.5 sm:py-3 rounded-xl font-semibold transition text-sm cursor-not-allowed"
+              >
+                Host
+              </button>
             </div>
           </div>
         </div>

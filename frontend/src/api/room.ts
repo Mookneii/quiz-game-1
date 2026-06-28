@@ -9,3 +9,6 @@ export const joinRoom = (data: { roomCode: string; nickname: string }) =>
 
 export const getRoomDetails = (roomCode: string) =>
   api.get(`/api/rooms/${roomCode}`);
+
+export const getRoomHistory = () =>
+  api.get('/api/rooms/history');

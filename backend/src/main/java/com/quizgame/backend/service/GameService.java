@@ -173,15 +173,21 @@ public class GameService {
             throw new BadRequestException("Question does not belong to quiz");
         }
 
-        Choice choice = choiceRepository.findById(request.getChoiceId())
-                .orElseThrow(() -> new NotFoundException("Choice not found"));
+        Choice choice = null;
+        boolean correct = false;
+        int points = 0;
 
-        if (!choice.getQuestion().getId().equals(question.getId())) {
-            throw new BadRequestException("Choice does not belong to question");
+        if (request.getChoiceId() != -1L) {
+            choice = choiceRepository.findById(request.getChoiceId())
+                    .orElseThrow(() -> new NotFoundException("Choice not found"));
+
+            if (!choice.getQuestion().getId().equals(question.getId())) {
+                throw new BadRequestException("Choice does not belong to question");
+            }
+
+            correct = Boolean.TRUE.equals(choice.getIsCorrect());
+            points = calculatePoints(correct, question.getTimeLimit(), request.getTimeTakenMs());
         }
-
-        boolean correct = Boolean.TRUE.equals(choice.getIsCorrect());
-        int points = calculatePoints(correct, question.getTimeLimit(), request.getTimeTakenMs());
 
         Answer answer = new Answer();
         answer.setRoom(room);
