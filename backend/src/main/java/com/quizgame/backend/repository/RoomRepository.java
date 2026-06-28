@@ -14,7 +14,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     boolean existsByRoomCode(String roomCode);
     List<Room> findByQuizId(Long quizId);
     
-    @Query("SELECT new com.quizgame.backend.dto.RoomHistoryDTO(r.roomCode, r.quiz.title, r.status, r.createdAt, r.endedAt, count(p.id)) " +
+    @Query("SELECT new com.quizgame.backend.dto.RoomHistoryDTO(r.roomCode, r.quiz.title, r.status, r.createdAt, r.endedAt, count(CASE WHEN p.host = false THEN 1 END)) " +
            "FROM Room r LEFT JOIN r.players p " +
            "WHERE r.host.id = :hostId " +
            "GROUP BY r.id, r.quiz.title " +
