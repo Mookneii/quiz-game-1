@@ -163,6 +163,10 @@ function HostLiveGame() {
                 setAnsweredPlayers((prev) =>
                   prev.includes(payload.playerId) ? prev : [...prev, payload.playerId]
                 )
+              } else if (event.type === 'PLAYER_JOINED') {
+                if (payload.players) {
+                  setPlayers(payload.players)
+                }
               } else if (event.type === 'LEADERBOARD_UPDATE') {
                 setPlayers(payload || [])
               } else if (event.type === 'GAME_FINISHED') {

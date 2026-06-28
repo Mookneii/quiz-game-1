@@ -232,6 +232,7 @@ export default LeaderboardPage
 function ReviewSection({ roomCode, myPlayerId }) {
   const [questions, setQuestions] = useState(null)
   const [userAnswers, setUserAnswers] = useState({})
+  const [visibleCount, setVisibleCount] = useState(10)
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -277,10 +278,12 @@ function ReviewSection({ roomCode, myPlayerId }) {
     return <p className="mt-6 text-center text-sm text-slate-400">No questions to review.</p>
   }
 
+  const visibleQuestions = questions.slice(0, visibleCount);
+
   return (
     <div className="mt-4 space-y-4">
-      {questions.map((q, idx) => (
-        <div key={q.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      {visibleQuestions.map((q, idx) => (
+        <div key={q.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '200px' }}>
           {/* Question header */}
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Question {idx + 1}
@@ -328,6 +331,15 @@ function ReviewSection({ roomCode, myPlayerId }) {
           </ul>
         </div>
       ))}
+      
+      {visibleCount < questions.length && (
+        <button
+          onClick={() => setVisibleCount(v => v + 10)}
+          className="w-full py-3 mt-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors"
+        >
+          Load More Questions
+        </button>
+      )}
     </div>
   )
 }
