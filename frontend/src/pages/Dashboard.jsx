@@ -4,6 +4,8 @@ import React, {
 } from "react";
 
 import { useNavigate } from "react-router-dom";
+import { MoreVertical, Pen, Trash } from "lucide-react";
+import Sidebar from "../components/Sidebar";
 
 export default function HostDashboard() {
   const navigate = useNavigate();
@@ -22,6 +24,12 @@ export default function HostDashboard() {
 
   // SIDEBAR OPEN (mobile)
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // DROPDOWN MENU
+  const [openDropdown, setOpenDropdown] = useState(null);
+
+  // DELETE MODAL
+  const [deleteQuizId, setDeleteQuizId] = useState(null);
 
   // TOKEN
   const token = localStorage.getItem("token");
@@ -143,90 +151,7 @@ export default function HostDashboard() {
   return (
     <div className="min-h-screen bg-[#f5f7fb] flex relative">
 
-      {/* MOBILE OVERLAY */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* SIDEBAR */}
-      <div
-        className={`
-          fixed top-0 left-0 h-full z-30 flex flex-col justify-between
-          bg-[#eef2f7] border-r w-[260px]
-          transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:static lg:translate-x-0 lg:flex lg:min-h-screen
-        `}
-      >
-        <div>
-          {/* LOGO */}
-          <div className="px-6 py-6 flex items-center gap-3">
-            <button
-              onClick={() => navigate("/")}
-              className="flex items-center gap-3 hover:opacity-80 transition cursor-pointer"
-              title="Go to Home"
-            >
-              <div className="w-10 h-10 rounded-xl bg-purple-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                Q
-              </div>
-              <h1 className="text-2xl font-bold text-gray-800">QuizUp</h1>
-            </button>
-
-            {/* CLOSE BUTTON (mobile) */}
-            <button
-              className="ml-auto text-gray-500 hover:text-gray-800 lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* MENU */}
-          <div className="px-3 space-y-2">
-            <button
-              className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl bg-emerald-500 text-white font-semibold shadow-md text-sm"
-              onClick={() => {
-                setSidebarOpen(false);
-                navigate("/");
-              }}
-              title="Go to Home"
-            >
-              📚 My Quizzes
-            </button>
-
-            <button
-              onClick={() => {
-                navigate("/create-quiz");
-                setSidebarOpen(false);
-              }}
-              className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-gray-700 hover:bg-white transition text-sm"
-            >
-              ➕ Create Quiz
-            </button>
-
-            <button className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-gray-700 hover:bg-white transition text-sm">
-              📈 Reports
-            </button>
-
-            <button className="w-full flex items-center gap-3 px-5 py-3 rounded-2xl text-gray-700 hover:bg-white transition text-sm">
-              ⚙️ Settings
-            </button>
-          </div>
-        </div>
-
-        {/* LOGOUT */}
-        <div className="p-4 border-t">
-          <button
-            onClick={handleLogout}
-            className="text-purple-400 flex items-center gap-3 px-4 py-3 hover:text-red-500 transition text-sm"
-          >
-            ↩ Logout
-          </button>
-        </div>
-      </div>
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
       {/* MAIN */}
       <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10">
@@ -316,29 +241,39 @@ export default function HostDashboard() {
                       📚
                     </div>
 
-                    <button
-                      onClick={async () => {
-                        if (
-                          window.confirm(
-                            "Are you sure you want to delete this quiz?"
-                          )
-                        ) {
-                          try {
-                            const { deleteQuiz } = await import(
-                              "../api/quiz"
-                            );
-                            await deleteQuiz(quiz.id);
-                            fetchQuizzes();
-                          } catch (err) {
-                            alert("Failed to delete quiz");
-                          }
-                        }
-                      }}
-                      className="text-red-400 hover:bg-red-50 p-2 rounded-lg text-xl"
-                      title="Delete Quiz"
-                    >
-                      🗑️
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={() => setOpenDropdown(openDropdown === quiz.id ? null : quiz.id)}
+                        className="text-gray-400 hover:bg-gray-50 p-2 rounded-lg transition"
+                        title="Options"
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+
+                      {/* DROPDOWN */}
+                      {openDropdown === quiz.id && (
+                        <div className="absolute right-0 mt-1 w-36 bg-white border rounded-xl shadow-lg z-10 py-1 overflow-hidden">
+                          <button
+                            onClick={() => {
+                              navigate(`/edit-quiz/${quiz.id}`);
+                              setOpenDropdown(null);
+                            }}
+                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-sm text-gray-700 transition"
+                          >
+                            <Pen size={16} /> Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOpenDropdown(null);
+                              setDeleteQuizId(quiz.id);
+                            }}
+                            className="w-full text-left px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 text-sm text-red-500 transition"
+                          >
+                            <Trash size={16} /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* TITLE */}
@@ -409,6 +344,42 @@ export default function HostDashboard() {
           </>
         )}
       </div>
+      {/* DELETE MODAL */}
+      {deleteQuizId !== null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-[90%] max-w-[420px] rounded-3xl p-6 sm:p-8 shadow-2xl">
+            <h2 className="text-2xl font-black">
+              Delete Quiz
+            </h2>
+            <p className="text-zinc-500 mt-3">
+              Are you sure you want to delete this quiz? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={() => setDeleteQuizId(null)}
+                className="border px-5 py-3 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const { deleteQuiz } = await import("../api/quiz");
+                    await deleteQuiz(deleteQuizId);
+                    setDeleteQuizId(null);
+                    fetchQuizzes();
+                  } catch (err) {
+                    alert("Failed to delete quiz");
+                  }
+                }}
+                className="bg-red-500 text-white px-5 py-3 rounded-2xl font-bold hover:bg-red-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

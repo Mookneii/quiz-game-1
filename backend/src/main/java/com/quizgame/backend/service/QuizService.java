@@ -7,8 +7,10 @@ import com.quizgame.backend.dto.QuizResponseDTO;
 import com.quizgame.backend.model.Choice;
 import com.quizgame.backend.model.Question;
 import com.quizgame.backend.model.Quiz;
+import com.quizgame.backend.model.Room;
 import com.quizgame.backend.model.User;
 import com.quizgame.backend.repository.QuizRepository;
+import com.quizgame.backend.repository.RoomRepository;
 import com.quizgame.backend.repository.UserRepository;
 
 import jakarta.persistence.ManyToOne;
@@ -26,12 +28,15 @@ public class QuizService {
     private User creator;
     private final QuizRepository quizRepository;
     private final UserRepository userRepository;
+    private final RoomRepository roomRepository;
 
     public QuizService(
             QuizRepository quizRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            RoomRepository roomRepository) {
         this.quizRepository = quizRepository;
         this.userRepository = userRepository;
+        this.roomRepository = roomRepository;
     }
 
     public boolean isQuizOwner(Long quizId, Long userId) {
@@ -66,7 +71,7 @@ public class QuizService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<QuizResponseDTO> getAllQuizzes() {
-        return quizRepository.findAll()
+        return quizRepository.findAllWithQuestions()
                 .stream()
                 .map(quiz -> new QuizResponseDTO(
                         quiz.getId(),
@@ -116,6 +121,16 @@ public class QuizService {
         }
         if (request.getQuestions() != null) {
             if (quiz.getQuestions() != null) {
+                // Delete all rooms associated with this quiz to avoid constraint violations on answers/questions
+                List<Room> rooms = roomRepository.findByQuizId(id);
+                if (!rooms.isEmpty()) {
+                    for (Room room : rooms) {
+                        room.setQuiz(null); // break reference
+                    }
+                    roomRepository.saveAll(rooms);
+                    roomRepository.deleteAll(rooms);
+                }
+
                 quiz.getQuestions().clear();
                 quiz.getQuestions().addAll(mapQuestions(request, quiz));
             } else {
@@ -132,6 +147,11 @@ public class QuizService {
     }
 
     public void deleteQuiz(Long id) {
+        List<Room> rooms = roomRepository.findByQuizId(id);
+        for (Room room : rooms) {
+            room.setQuiz(null);
+            roomRepository.save(room);
+        }
         quizRepository.deleteById(id);
     }
 

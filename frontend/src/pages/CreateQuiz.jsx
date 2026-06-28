@@ -1,7 +1,8 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createQuiz } from "../api/quiz";
-import { ArrowLeft, Upload } from "lucide-react";
+import { ArrowLeft, Upload, Menu } from "lucide-react";
+import Sidebar from "../components/Sidebar";
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ export default function CreateQuiz() {
     description: "",
     cover: null,
   });
+  
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleCoverUpload = (e) => {
     const file = e.target.files[0];
@@ -25,10 +28,19 @@ export default function CreateQuiz() {
         alert("Please enter a quiz title.");
         return;
       }
+
+      const userStr = localStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (!user) {
+        alert("Please log in to create a quiz.");
+        return;
+      }
+
       const response = await createQuiz({
         id: null,
         title: quiz.title,
         description: quiz.description || "",
+        creatorId: user.id,
         questions: [],
       });
       if (response.data && response.data.id) {
@@ -46,18 +58,29 @@ export default function CreateQuiz() {
     : "bg-gradient-to-r from-indigo-500 to-emerald-500";
 
   return (
-    <div className="min-h-screen bg-zinc-100">
-      {/* TOPBAR */}
-      <div className="h-14 sm:h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6">
-        <button
-          onClick={() => navigate("/host")}
-          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-lg sm:text-xl font-black text-emerald-500">QuizUp</h1>
-        <div />
-      </div>
+    <div className="min-h-screen bg-zinc-100 flex relative overflow-x-hidden">
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* TOPBAR */}
+        <div className="h-14 sm:h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 transition"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              onClick={() => navigate("/host")}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          </div>
+          <h1 className="text-lg sm:text-xl font-black text-emerald-500">QuizUp</h1>
+          <div />
+        </div>
 
       {/* CONTENT — stacks on mobile, side-by-side on lg+ */}
       <div className="flex flex-col lg:grid lg:grid-cols-[1fr_320px]">
@@ -102,7 +125,7 @@ export default function CreateQuiz() {
                 />
                 <button
                   onClick={() => coverInputRef.current.click()}
-                  className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 mx-auto text-sm sm:text-base"
+                  className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 mx-auto text-sm sm:text-base hover:bg-emerald-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
                 >
                   <Upload size={18} />
                   Choose Cover
@@ -116,7 +139,7 @@ export default function CreateQuiz() {
             {/* SUBMIT */}
             <button
               onClick={handleCreateQuiz}
-              className="w-full sm:w-auto bg-zinc-900 text-white px-6 py-3 rounded-2xl font-bold text-sm sm:text-base"
+              className="w-full sm:w-auto bg-zinc-900 text-white px-6 py-3 rounded-2xl font-bold text-sm sm:text-base hover:bg-zinc-800 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-md hover:shadow-lg"
             >
               Create &amp; Add Questions
             </button>
@@ -136,10 +159,10 @@ export default function CreateQuiz() {
             />
 
             <div className="p-4 sm:p-5">
-              <h3 className="font-black text-xl sm:text-2xl">
+              <h3 className="font-black text-xl sm:text-2xl break-words">
                 {quiz.title || "Quiz Title"}
               </h3>
-              <p className="text-sm text-zinc-500 mt-2">
+              <p className="text-sm text-zinc-500 mt-2 break-words">
                 {quiz.description || "Quiz description preview"}
               </p>
               <div className="mt-4">
@@ -151,6 +174,7 @@ export default function CreateQuiz() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

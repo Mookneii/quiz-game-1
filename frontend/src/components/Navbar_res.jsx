@@ -90,26 +90,26 @@ export default function Navbar_res({ pin, score }) {
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-sm font-bold text-white shrink-0">
             Q
           </div>
-          <span className="text-xl font-bold text-emerald-600">QuizUp</span>
+          <span className="text-xl font-bold text-emerald-600 hidden sm:block">QuizUp</span>
         </Link>
 
         {/* Right-side badges */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Game PIN badge */}
-          <div className="flex items-center gap-1.5 rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold text-white sm:text-sm">
-            <span className="text-slate-400 tracking-wide">PIN</span>
+          <div className="flex items-center gap-1.5 rounded-full bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] font-semibold text-white sm:text-sm shrink-0">
+            <span className="text-slate-400 tracking-wide hidden sm:inline">PIN</span>
             <span className="text-white">{displayPin}</span>
           </div>
 
           {/* Score / player-count badge */}
-          <div className="flex items-center gap-2 rounded-full bg-slate-800 px-4 py-2 text-xs font-semibold text-white sm:text-sm">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-400 text-yellow-800 text-xs leading-none">
+          <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] font-semibold text-white sm:text-sm shrink-0 min-w-0">
+            <span className="flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-yellow-400 text-yellow-800 text-[10px] sm:text-xs leading-none shrink-0">
               ★
             </span>
-            <span>{displayRight.label}</span>
+            <span className="whitespace-nowrap truncate">{displayRight.label}</span>
           </div>
         </div>
       </div>

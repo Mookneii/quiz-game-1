@@ -16,7 +16,9 @@ import {
   Upload,
   Check,
   Eye,
+  Menu,
 } from "lucide-react";
+import Sidebar from "../components/Sidebar";
 
 export default function EditQuiz() {
   const navigate = useNavigate();
@@ -34,6 +36,8 @@ export default function EditQuiz() {
   });
 
   const [questions, setQuestions] = useState([]);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [showAddPanel, setShowAddPanel] =
     useState(false);
@@ -58,6 +62,7 @@ export default function EditQuiz() {
       answers: ["", "", "", ""],
       correct: null,
       difficulty: "easy",
+      timeLimit: 20,
     });
 
   // No cover logic needed in edit view for questions
@@ -76,12 +81,13 @@ export default function EditQuiz() {
               cover: null, // Assume no cover for simplicity unless handled
             });
             const loadedQs = (res.data.questions || []).map(q => {
-              const correctAnswerIdx = q.choices?.findIndex(c => c.isCorrect);
+              const correctAnswerIdx = q.choices?.findIndex(c => c.isCorrect === true || c.correct === true);
               return {
                 question: q.questionText,
                 answers: q.choices?.map(c => c.choiceText) || ["", "", "", ""],
                 correct: correctAnswerIdx >= 0 ? correctAnswerIdx : null,
                 difficulty: "medium", // Default, could map from data if it existed
+                timeLimit: q.timeLimit || 20,
               };
             });
             setQuestions(loadedQs);
@@ -124,6 +130,7 @@ export default function EditQuiz() {
                    ? q.choices.findIndex(c => c.isCorrect === true || c.correct === true) 
                    : (typeof q.correctChoiceIndex === "number" ? q.correctChoiceIndex : 0),
           difficulty: q.difficulty?.toLowerCase() || "medium",
+          timeLimit: q.timeLimit || 20,
         }));
         
         setQuestions((prev) => [
@@ -184,6 +191,7 @@ export default function EditQuiz() {
       answers: ["", "", "", ""],
       correct: null,
       difficulty: "easy",
+      timeLimit: 20,
     });
 
     setShowAddPanel(false);
@@ -222,6 +230,11 @@ export default function EditQuiz() {
       return;
     }
 
+    if (editingQuestion.data.correct === null || editingQuestion.data.correct === undefined || editingQuestion.data.correct === -1) {
+      alert("Please select the correct answer");
+      return;
+    }
+
     const updated = [...questions];
 
     updated[editingQuestion.index] = {
@@ -235,31 +248,39 @@ export default function EditQuiz() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100">
-      {/* NAVBAR */}
-
-      <div className="h-16 bg-white border-b flex items-center justify-between px-6">
-        <button
-          onClick={() => navigate("/host")}
-          className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
-        >
-          ←
-        </button>
-
-        <h1 className="text-xl font-black text-emerald-500">QuizUp</h1>
-
-        <div />
-      </div>
+    <div className="min-h-screen bg-zinc-100 flex relative overflow-x-hidden">
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* NAVBAR */}
+        <div className="h-14 sm:h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              className="lg:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white border flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 transition"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              onClick={() => navigate("/host")}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          </div>
+          <h1 className="text-lg sm:text-xl font-black text-emerald-500">QuizUp</h1>
+          <div />
+        </div>
 
       {/* EDIT PAGE */}
 
-      <div className="p-10">
+      <div className="p-4 sm:p-6 lg:p-10">
 
           {/* HEADER */}
 
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
-              <h2 className="text-4xl font-black">
+              <h2 className="text-2xl sm:text-4xl font-black break-words">
                 Edit / Add Questions
               </h2>
 
@@ -268,19 +289,24 @@ export default function EditQuiz() {
               </p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {/* DONE */}
 
               <button
                 onClick={async () => {
                   try {
-                    const mappedQuestions = questions.map(q => ({
-                      questionText: q.question,
-                      choices: q.answers.map((ans, i) => ({
-                        choiceText: ans,
-                        isCorrect: i === q.correct
-                      }))
-                    }));
+                    const mappedQuestions = questions.map(q => {
+                      const correctIndex = (q.correct === null || q.correct === undefined || q.correct === -1) ? 0 : q.correct;
+                      return {
+                        questionText: q.question,
+                        timeLimit: parseInt(q.timeLimit) || 20,
+                        difficulty: q.difficulty,
+                        choices: q.answers.map((ans, i) => ({
+                          choiceText: ans,
+                          isCorrect: i === correctIndex
+                        }))
+                      };
+                    });
                     
                     const token = localStorage.getItem("token");
                     const userStr = localStorage.getItem("user");
@@ -310,13 +336,13 @@ export default function EditQuiz() {
                     alert("Error saving quiz: " + (err.response?.data?.message || err.message));
                   }
                 }}
-                className="bg-blue-500 text-white px-5 py-3 rounded-2xl font-bold"
+                className="bg-blue-500 hover:bg-blue-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow text-white px-5 py-3 rounded-2xl font-bold"
               >
                 Done
               </button>
 
               {/* AI */}
-
+              {/*
               <input
                 hidden
                 type="file"
@@ -332,7 +358,7 @@ export default function EditQuiz() {
                 className={`px-5 py-3 rounded-2xl font-bold flex items-center gap-2 text-white ${
                   isGeneratingAI
                     ? "bg-emerald-300 cursor-not-allowed"
-                    : "bg-emerald-500"
+                    : "bg-emerald-500 hover:bg-emerald-600 transition"
                 }`}
               >
                 <Sparkles size={18} />
@@ -341,6 +367,7 @@ export default function EditQuiz() {
                   ? "Generating..."
                   : "AI Generate"}
               </button>
+              */}
 
               {/* ADD */}
 
@@ -348,7 +375,7 @@ export default function EditQuiz() {
                 onClick={() =>
                   setShowAddPanel(true)
                 }
-                className="bg-zinc-900 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2"
+                className="bg-zinc-900 hover:bg-zinc-800 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2"
               >
                 <Plus size={18} />
                 Add Question
@@ -366,26 +393,31 @@ export default function EditQuiz() {
               >
                 <div className="flex justify-between">
                   <div className="flex-1">
-                    <div className="font-black text-lg">
+                    <div className="font-black text-lg break-words">
                       {index + 1}. {q.question}
                     </div>
 
                     <div className="mt-3">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${
-                          q.difficulty === "easy"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : q.difficulty ===
-                              "medium"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {q.difficulty}
-                      </span>
+                      <div className="flex gap-2">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${
+                            q.difficulty === "easy"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : q.difficulty ===
+                                "medium"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          {q.difficulty}
+                        </span>
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700">
+                          ⏱ {q.timeLimit || 20}s
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
                       {q.answers.map((ans, i) => (
                         <div
                           key={i}
@@ -396,10 +428,10 @@ export default function EditQuiz() {
                           }`}
                         >
                           {q.correct === i && (
-                            <Check size={16} />
+                            <Check size={16} className="flex-shrink-0" />
                           )}
 
-                          {ans}
+                          <span className="break-words min-w-0">{ans}</span>
                         </div>
                       ))}
                     </div>
@@ -417,7 +449,7 @@ export default function EditQuiz() {
                             : index
                         )
                       }
-                      className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center"
+                      className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
                     >
                       <Settings2 size={18} />
                     </button>
@@ -443,7 +475,7 @@ export default function EditQuiz() {
                               },
                             });
                           }}
-                          className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center"
+                          className="w-10 h-10 rounded-xl bg-zinc-100 hover:bg-zinc-200 transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
                         >
                           <Pencil size={16} />
                         </button>
@@ -458,7 +490,7 @@ export default function EditQuiz() {
 
                             setDeleteIndex(index);
                           }}
-                          className="w-10 h-10 rounded-xl bg-red-100 text-red-500 flex items-center justify-center"
+                          className="w-10 h-10 rounded-xl bg-red-100 hover:bg-red-200 transition-all hover:scale-105 active:scale-95 text-red-500 flex items-center justify-center"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -477,12 +509,12 @@ export default function EditQuiz() {
 
       {showAddPanel && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[800px] rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-[90%] max-w-[800px] rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-black">Add Question</h2>
               <button
                 onClick={() => setShowAddPanel(false)}
-                className="border px-4 py-2 rounded-2xl font-bold"
+                className="border px-4 py-2 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
               >
                 Close
               </button>
@@ -499,7 +531,7 @@ export default function EditQuiz() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
               {newQuestion.answers.map((a, i) => (
                 <input
                   key={i}
@@ -524,10 +556,10 @@ export default function EditQuiz() {
                     onClick={() =>
                       setNewQuestion({ ...newQuestion, correct: i })
                     }
-                    className={`w-12 h-12 rounded-2xl border font-black ${
+                    className={`w-12 h-12 rounded-2xl border font-black transition-all hover:-translate-y-0.5 active:translate-y-0 ${
                       newQuestion.correct === i
-                        ? "bg-emerald-500 text-white"
-                        : ""
+                        ? "bg-emerald-500 text-white shadow-md"
+                        : "hover:bg-zinc-50"
                     }`}
                   >
                     {String.fromCharCode(65 + i)}
@@ -536,37 +568,60 @@ export default function EditQuiz() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <div className="font-bold text-sm mb-2">Difficulty</div>
-              <div className="flex gap-2">
-                {["easy", "medium", "hard"].map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() =>
-                      setNewQuestion({ ...newQuestion, difficulty: diff })
-                    }
-                    className={`px-4 py-2 rounded-xl font-bold capitalize ${
-                      newQuestion.difficulty === diff
-                        ? "bg-emerald-500 text-white"
-                        : "bg-zinc-100"
-                    }`}
-                  >
-                    {diff}
-                  </button>
-                ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+              <div>
+                <div className="font-bold text-sm mb-2">Difficulty</div>
+                <div className="flex flex-wrap gap-2">
+                  {["easy", "medium", "hard"].map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() =>
+                        setNewQuestion({ ...newQuestion, difficulty: diff })
+                      }
+                      className={`px-4 py-2 rounded-xl font-bold capitalize transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+                        newQuestion.difficulty === diff
+                          ? "bg-emerald-500 text-white shadow-md"
+                          : "bg-zinc-100 hover:bg-zinc-200"
+                      }`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="font-bold text-sm mb-2">Time Limit (seconds)</div>
+                <div className="flex flex-wrap gap-2">
+                  {[10, 20, 30, 60].map((time) => (
+                    <button
+                      key={time}
+                      onClick={() =>
+                        setNewQuestion({ ...newQuestion, timeLimit: time })
+                      }
+                      className={`px-4 py-2 rounded-xl font-bold transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+                        newQuestion.timeLimit === time
+                          ? "bg-blue-500 text-white shadow-md"
+                          : "bg-zinc-100 hover:bg-zinc-200"
+                      }`}
+                    >
+                      {time}s
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-10">
               <button
                 onClick={() => setShowAddPanel(false)}
-                className="border px-5 py-3 rounded-2xl font-bold"
+                className="border px-5 py-3 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={saveQuestion}
-                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
+                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
               >
                 Save Question
               </button>
@@ -579,7 +634,7 @@ export default function EditQuiz() {
 
       {deleteIndex !== null && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[420px] rounded-3xl p-8">
+          <div className="bg-white w-[90%] max-w-[420px] rounded-3xl p-6 sm:p-8">
             <h2 className="text-2xl font-black">
               Delete Question
             </h2>
@@ -594,14 +649,14 @@ export default function EditQuiz() {
                 onClick={() =>
                   setDeleteIndex(null)
                 }
-                className="border px-5 py-3 rounded-2xl font-bold"
+                className="border px-5 py-3 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
               >
                 Cancel
               </button>
 
               <button
                 onClick={deleteQuestion}
-                className="bg-red-500 text-white px-5 py-3 rounded-2xl font-bold"
+                className="bg-red-500 text-white px-5 py-3 rounded-2xl font-bold hover:bg-red-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
               >
                 Delete
               </button>
@@ -614,7 +669,7 @@ export default function EditQuiz() {
 
       {editingQuestion && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-[800px] rounded-3xl p-8 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-[90%] max-w-[800px] rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center">
               <h2 className="text-3xl font-black">
                 Edit Question
@@ -624,7 +679,7 @@ export default function EditQuiz() {
                 onClick={() =>
                   setEditingQuestion(null)
                 }
-                className="border px-4 py-2 rounded-2xl font-bold"
+                className="border px-4 py-2 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
               >
                 Close
               </button>
@@ -649,7 +704,7 @@ export default function EditQuiz() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3 mt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6">
               {editingQuestion.data.answers.map(
                 (ans, i) => (
                   <input
@@ -696,11 +751,11 @@ export default function EditQuiz() {
                         },
                       })
                     }
-                    className={`w-12 h-12 rounded-2xl border font-black ${
+                    className={`w-12 h-12 rounded-2xl border font-black transition-all hover:-translate-y-0.5 active:translate-y-0 ${
                       editingQuestion.data
                         .correct === i
-                        ? "bg-emerald-500 text-white"
-                        : ""
+                        ? "bg-emerald-500 text-white shadow-md"
+                        : "hover:bg-zinc-50"
                     }`}
                   >
                     {String.fromCharCode(
@@ -711,38 +766,70 @@ export default function EditQuiz() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <div className="font-bold text-sm mb-2">
-                Difficulty
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+              <div>
+                <div className="font-bold text-sm mb-2">
+                  Difficulty
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    "easy",
+                    "medium",
+                    "hard",
+                  ].map((diff) => (
+                    <button
+                      key={diff}
+                      onClick={() =>
+                        setEditingQuestion({
+                          ...editingQuestion,
+                          data: {
+                            ...editingQuestion.data,
+                            difficulty: diff,
+                          },
+                        })
+                      }
+                      className={`px-4 py-2 rounded-xl font-bold capitalize transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+                        editingQuestion.data
+                          .difficulty === diff
+                          ? "bg-emerald-500 text-white shadow-md"
+                          : "bg-zinc-100 hover:bg-zinc-200"
+                      }`}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex gap-2">
-                {[
-                  "easy",
-                  "medium",
-                  "hard",
-                ].map((diff) => (
-                  <button
-                    key={diff}
-                    onClick={() =>
-                      setEditingQuestion({
-                        ...editingQuestion,
-                        data: {
-                          ...editingQuestion.data,
-                          difficulty: diff,
-                        },
-                      })
-                    }
-                    className={`px-4 py-2 rounded-xl font-bold capitalize ${
-                      editingQuestion.data
-                        .difficulty === diff
-                        ? "bg-emerald-500 text-white"
-                        : "bg-zinc-100"
-                    }`}
-                  >
-                    {diff}
-                  </button>
-                ))}
+              <div>
+                <div className="font-bold text-sm mb-2">
+                  Time Limit (seconds)
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {[10, 20, 30, 60].map((time) => (
+                    <button
+                      key={time}
+                      onClick={() =>
+                        setEditingQuestion({
+                          ...editingQuestion,
+                          data: {
+                            ...editingQuestion.data,
+                            timeLimit: time,
+                          },
+                        })
+                      }
+                      className={`px-4 py-2 rounded-xl font-bold transition-all hover:-translate-y-0.5 active:translate-y-0 ${
+                        editingQuestion.data.timeLimit === time
+                          ? "bg-blue-500 text-white shadow-md"
+                          : "bg-zinc-100 hover:bg-zinc-200"
+                      }`}
+                    >
+                      {time}s
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -751,14 +838,14 @@ export default function EditQuiz() {
                 onClick={() =>
                   setEditingQuestion(null)
                 }
-                className="border px-5 py-3 rounded-2xl font-bold"
+                className="border px-5 py-3 rounded-2xl font-bold hover:bg-zinc-100 transition-all"
               >
                 Cancel
               </button>
 
               <button
                 onClick={saveEdit}
-                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold"
+                className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold hover:bg-emerald-600 transition-all hover:-translate-y-0.5 active:translate-y-0 shadow-sm hover:shadow"
               >
                 Save Changes
               </button>
@@ -766,6 +853,7 @@ export default function EditQuiz() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
