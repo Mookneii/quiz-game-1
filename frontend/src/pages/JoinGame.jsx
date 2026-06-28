@@ -73,8 +73,15 @@ export default function JoinGame() {
         <div className="max-w-6xl w-full grid md:grid-cols-2 gap-20 items-center">
           {/* LEFT CARD */}
           <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md mx-auto w-full">
-            {/* Icon */}
+            {/* Back button */}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1 text-gray-400 hover:text-gray-700 transition text-sm mb-4"
+            >
+              ← Back
+            </button>
 
+            {/* Icon */}
             <div className="flex justify-center mb-6">
               <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
                 Q

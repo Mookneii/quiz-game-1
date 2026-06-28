@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createQuiz } from "../api/quiz";
-import { ArrowLeft, Upload, Eye } from "lucide-react";
+import { ArrowLeft, Upload } from "lucide-react";
 
 export default function CreateQuiz() {
   const navigate = useNavigate();
@@ -47,87 +47,102 @@ export default function CreateQuiz() {
 
   return (
     <div className="min-h-screen bg-zinc-100">
-      <div className="h-16 bg-white border-b flex items-center justify-between px-6">
+      {/* TOPBAR */}
+      <div className="h-14 sm:h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6">
         <button
           onClick={() => navigate("/host")}
-          className="w-10 h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
+          className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-zinc-100 flex items-center justify-center"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-black text-emerald-500">QuizUp</h1>
+        <h1 className="text-lg sm:text-xl font-black text-emerald-500">QuizUp</h1>
         <div />
       </div>
 
-      <div className="grid grid-cols-[1fr_320px]">
-        <div className="p-10">
-          <h2 className="text-4xl font-black">Create Quiz</h2>
+      {/* CONTENT — stacks on mobile, side-by-side on lg+ */}
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_320px]">
 
-          <div className="space-y-6 mt-8">
+        {/* LEFT: form */}
+        <div className="p-5 sm:p-8 lg:p-10">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black">Create Quiz</h2>
+
+          <div className="space-y-5 mt-6 sm:mt-8">
+            {/* TITLE */}
             <div>
               <label className="text-sm font-bold">Quiz Title</label>
               <input
-                className="w-full border rounded-2xl px-4 py-3 mt-2"
+                className="w-full border rounded-2xl px-4 py-3 mt-2 text-sm sm:text-base outline-none focus:ring-2 focus:ring-emerald-400"
                 placeholder="Quiz title..."
                 value={quiz.title}
                 onChange={(e) => setQuiz({ ...quiz, title: e.target.value })}
               />
             </div>
 
+            {/* DESCRIPTION */}
             <div>
               <label className="text-sm font-bold">Description</label>
               <textarea
-                className="w-full border rounded-2xl px-4 py-3 mt-2 h-32"
+                className="w-full border rounded-2xl px-4 py-3 mt-2 h-28 sm:h-32 text-sm sm:text-base outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
                 placeholder="Quiz description..."
                 value={quiz.description}
                 onChange={(e) => setQuiz({ ...quiz, description: e.target.value })}
               />
             </div>
 
+            {/* COVER IMAGE */}
             <div>
               <label className="text-sm font-bold">Cover Image</label>
-              <div className="mt-3 border-2 border-dashed rounded-3xl p-8 bg-white text-center">
+              <div className="mt-3 border-2 border-dashed rounded-3xl p-6 sm:p-8 bg-white text-center">
                 <input
                   hidden
                   ref={coverInputRef}
                   type="file"
-                  accept={"image/*"}
+                  accept="image/*"
                   onChange={handleCoverUpload}
                 />
                 <button
                   onClick={() => coverInputRef.current.click()}
-                  className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 mx-auto"
+                  className="bg-emerald-500 text-white px-5 py-3 rounded-2xl font-bold flex items-center gap-2 mx-auto text-sm sm:text-base"
                 >
                   <Upload size={18} />
                   Choose Cover
                 </button>
-                <p className="text-sm text-zinc-500 mt-4">Upload cover image</p>
+                <p className="text-xs sm:text-sm text-zinc-500 mt-3">
+                  Upload cover image
+                </p>
               </div>
             </div>
 
+            {/* SUBMIT */}
             <button
               onClick={handleCreateQuiz}
-              className="bg-zinc-900 text-white px-6 py-3 rounded-2xl font-bold"
+              className="w-full sm:w-auto bg-zinc-900 text-white px-6 py-3 rounded-2xl font-bold text-sm sm:text-base"
             >
               Create &amp; Add Questions
             </button>
           </div>
         </div>
 
-        <div className="bg-white border-l p-6">
+        {/* RIGHT: live preview — shown below form on mobile, beside on desktop */}
+        <div className="bg-white border-t lg:border-t-0 lg:border-l p-5 sm:p-6">
           <div className="text-xs uppercase font-bold text-zinc-400">Live Preview</div>
 
           <div className="mt-4 border rounded-3xl overflow-hidden">
             <div
-              className={`h-44 ${coverBg}`}
-              style={{ backgroundImage: quiz.cover ? `url(${quiz.cover})` : "none" }}
+              className={`h-36 sm:h-44 ${coverBg}`}
+              style={{
+                backgroundImage: quiz.cover ? `url(${quiz.cover})` : "none",
+              }}
             />
 
-            <div className="p-5">
-              <h3 className="font-black text-2xl">{quiz.title || "Quiz Title"}</h3>
+            <div className="p-4 sm:p-5">
+              <h3 className="font-black text-xl sm:text-2xl">
+                {quiz.title || "Quiz Title"}
+              </h3>
               <p className="text-sm text-zinc-500 mt-2">
                 {quiz.description || "Quiz description preview"}
               </p>
-              <div className="mt-5">
+              <div className="mt-4">
                 <span className="bg-zinc-100 px-3 py-1 rounded-full text-xs font-bold">
                   New Quiz
                 </span>
