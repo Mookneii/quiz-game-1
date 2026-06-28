@@ -4,6 +4,7 @@ import com.quizgame.backend.dto.AnswerResultDTO;
 import com.quizgame.backend.dto.GameResultDTO;
 import com.quizgame.backend.dto.NextQuestionRequest;
 import com.quizgame.backend.dto.QuestionDTO;
+import com.quizgame.backend.dto.ReviewDTO;
 import com.quizgame.backend.dto.RoomCodeRequest;
 import com.quizgame.backend.dto.SubmitAnswerRequest;
 import com.quizgame.backend.service.GameService;
@@ -88,5 +89,12 @@ public class GameController {
     @GetMapping("/{roomCode}/results")
     public List<GameResultDTO> getResults(@PathVariable String roomCode) {
         return gameService.getResults(roomCode);
+    }
+
+    @GetMapping("/{roomCode}/review")
+    public ReviewDTO getReview(
+            @PathVariable String roomCode,
+            @RequestParam(required = false) Long playerId) {
+        return gameService.getReview(roomCode, playerId);
     }
 }

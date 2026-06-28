@@ -8,6 +8,7 @@ import com.quizgame.backend.dto.GameStartedPayload;
 import com.quizgame.backend.dto.LeaderboardEntryDTO;
 import com.quizgame.backend.dto.QuestionDTO;
 import com.quizgame.backend.dto.QuestionStartedPayload;
+import com.quizgame.backend.dto.ReviewDTO;
 import com.quizgame.backend.dto.SubmitAnswerRequest;
 import com.quizgame.backend.exception.BadRequestException;
 import com.quizgame.backend.exception.NotFoundException;
@@ -31,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -330,5 +333,31 @@ public class GameService {
 
     private int safeScore(RoomPlayer player) {
         return player.getScore() != null ? player.getScore() : 0;
+    }
+
+    public ReviewDTO getReview(String roomCode, Long playerId) {
+        Room room = roomRepository.findByRoomCode(roomCode)
+                .orElseThrow(() -> new NotFoundException("Room not found"));
+
+        if (room.getQuiz() == null || room.getQuiz().getQuestions() == null) {
+            return new ReviewDTO(new ArrayList<>(), new HashMap<>());
+        }
+
+        List<ReviewDTO.ReviewQuestionDTO> questions = room.getQuiz().getQuestions().stream().map(q -> {
+            List<ReviewDTO.ReviewChoiceDTO> choices = q.getChoices().stream().map(c ->
+                    new ReviewDTO.ReviewChoiceDTO(c.getId(), c.getChoiceText(), Boolean.TRUE.equals(c.getIsCorrect()))
+            ).collect(Collectors.toList());
+            return new ReviewDTO.ReviewQuestionDTO(q.getId(), q.getQuestionText(), choices);
+        }).collect(Collectors.toList());
+
+        Map<Long, Long> userAnswersMap = new HashMap<>();
+        if (playerId != null) {
+            List<Answer> answers = answerRepository.findByRoomIdAndPlayerIdOrderByIdDesc(room.getId(), playerId);
+            for (Answer a : answers) {
+                userAnswersMap.putIfAbsent(a.getQuestion().getId(), a.getChoice().getId());
+            }
+        }
+
+        return new ReviewDTO(questions, userAnswersMap);
     }
 }
