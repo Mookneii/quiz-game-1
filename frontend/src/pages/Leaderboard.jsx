@@ -61,7 +61,7 @@ const LeaderboardPage = () => {
     const fetchResults = async () => {
       try {
         const res = await fetch(
-          `http://${window.location.hostname}:8080/api/games/${roomCode}/results?t=${Date.now()}`
+          `https://quizgame-backend-production-5fa0.up.railway.app/api/games/${roomCode}/results?t=${Date.now()}`
         )
         if (!res.ok) return
 
@@ -245,7 +245,7 @@ function ReviewSection({ roomCode, myPlayerId }) {
           return
         }
 
-        const url = new URL(`http://${window.location.hostname}:8080/api/games/${roomCode}/review`)
+        const url = new URL(`https://quizgame-backend-production-5fa0.up.railway.app/api/games/${roomCode}/review`)
         url.searchParams.append('t', Date.now())
         if (myPlayerId) {
           url.searchParams.append('playerId', myPlayerId)

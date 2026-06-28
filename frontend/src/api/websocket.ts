@@ -2,7 +2,7 @@
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8080`
+const API_BASE_URL = import.meta.env.VITE_API_URL || `https://quizgame-backend-production-5fa0.up.railway.app`
 export const WS_URL = `${API_BASE_URL.replace(/\/$/, '')}/ws`
 
 export const createStompClient = () =>

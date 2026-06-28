@@ -228,7 +228,7 @@ const AnswerRes = () => {
 
 			// Fetch room status to catch if GAME_FINISHED was sent while we were connecting
 			try {
-				fetch(`http://${window.location.hostname}:8080/api/rooms/${gamePin}`)
+				fetch(`https://quizgame-backend-production-5fa0.up.railway.app/api/rooms/${gamePin}`)
 					.then(res => res.json())
 					.then(data => {
 						if (data && data.status === 'FINISHED') {
