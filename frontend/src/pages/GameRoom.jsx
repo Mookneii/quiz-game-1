@@ -285,11 +285,6 @@ function GameRoom() {
             </div>
           )}
 
-          {/* Game PIN */}
-          <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70">
-            PIN: {gamePin}
-          </div>
-
           {/* Total Score */}
           <div className="bg-white/10 rounded-full px-4 py-2 text-sm font-semibold text-white/70 flex items-center gap-2">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-yellow-300 text-yellow-700 text-xs">★</span>
