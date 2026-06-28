@@ -4,8 +4,6 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### Local config ###
-src/main/resources/application*.yaml
 
 ### STS ###
 .apt_generated
