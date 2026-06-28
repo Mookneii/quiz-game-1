@@ -141,7 +141,7 @@ export default function HostDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] flex relative">
+    <div className="h-screen bg-[#f5f7fb] flex relative overflow-hidden">
 
       {/* MOBILE OVERLAY */}
       {sidebarOpen && (
@@ -229,7 +229,7 @@ export default function HostDashboard() {
       </div>
 
       {/* MAIN */}
-      <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10">
+      <div className="flex-1 min-w-0 p-4 sm:p-6 lg:p-10 overflow-y-auto h-full">
 
         {/* TOPBAR */}
         <div className="mb-6 lg:mb-10">
