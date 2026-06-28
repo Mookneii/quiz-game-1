@@ -66,7 +66,7 @@ const CHOICE_COLORS = [
 
 function ChoiceCard({ choice, index }) {
   return (
-    <div className={`rounded-2xl border px-4 py-3 text-sm font-semibold shadow-sm ${CHOICE_COLORS[index % 4]}`}>
+    <div className={`flex min-h-[120px] items-center justify-center rounded-2xl border px-6 py-6 text-center text-xl font-bold shadow-md sm:min-h-[160px] sm:px-8 sm:py-10 sm:text-2xl ${CHOICE_COLORS[index % 4]}`}>
       {choice.choiceText}
     </div>
   )
@@ -91,13 +91,23 @@ function HostLiveGame() {
   const [connectionStatus,    setConnectionStatus]    = useState('connecting')
   const [players,             setPlayers]             = useState([])
   const [currentQuestion,     setCurrentQuestion]     = useState(null)
-  const [questionIndex,       setQuestionIndex]       = useState(0)
+  const [questionIndex,       setQuestionIndex]       = useState(() => {
+    const saved = sessionStorage.getItem(`room_${gamePin}_questionIndex`);
+    return saved !== null ? parseInt(saved, 10) : 0;
+  })
   const [totalQuestions,      setTotalQuestions]      = useState(0)
   const [answeredPlayers,     setAnsweredPlayers]     = useState([])
   const [nextQuestionLoading, setNextQuestionLoading] = useState(false)
   const [questionError,       setQuestionError]       = useState('')
+  const [timeLeft,            setTimeLeft]            = useState(null)
 
   const firstQuestionRequestedRef = useRef(false)
+  const endTimeRef = useRef(0)
+
+  // ── Sync Question Index to SessionStorage ──────────────────────────────────
+  useEffect(() => {
+    sessionStorage.setItem(`room_${gamePin}_questionIndex`, questionIndex);
+  }, [questionIndex, gamePin]);
 
   // ── Derived values ─────────────────────────────────────────────────────────
   const nonHostPlayers  = players.filter((p) => !p.host)
@@ -106,6 +116,29 @@ function HostLiveGame() {
   const answeredPercent = totalPlayers > 0 ? Math.round((answeredCount / totalPlayers) * 100) : 0
   const progressPercent = totalQuestions > 0 ? Math.round(((questionIndex + 1) / totalQuestions) * 100) : 0
   const isLastQuestion  = questionIndex + 1 >= totalQuestions && totalQuestions > 0
+
+  // ── Timer Logic ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0) return
+
+    const id = setInterval(() => {
+      setTimeLeft(() => {
+        const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000))
+        return remaining
+      })
+    }, 1000)
+
+    return () => clearInterval(id)
+  }, [timeLeft])
+
+  const timerColor =
+    timeLeft === null
+      ? 'bg-slate-700'
+      : timeLeft > (currentQuestion?.timeLimit ?? 30) * 0.5
+      ? 'bg-emerald-500'
+      : timeLeft > (currentQuestion?.timeLimit ?? 30) * 0.25
+      ? 'bg-yellow-500'
+      : 'bg-red-500'
 
   // ── WebSocket + initial fetch ──────────────────────────────────────────────
   useEffect(() => {
@@ -146,10 +179,13 @@ function HostLiveGame() {
               const payload = event.data ?? event.payload ?? {}
 
               if (event.type === 'QUESTION_STARTED') {
-                setCurrentQuestion(payload.question || payload.questionDTO || null)
+                const q = payload.question || payload.questionDTO || null
+                setCurrentQuestion(q)
                 setQuestionIndex(payload.questionIndex ?? 0)
                 setTotalQuestions(payload.totalQuestions ?? 0)
                 setAnsweredPlayers([])
+                setTimeLeft(q?.timeLimit ?? null)
+                endTimeRef.current = Date.now() + (q?.timeLimit || 0) * 1000
               } else if (event.type === 'ANSWER_RESULT') {
                 setAnsweredPlayers((prev) =>
                   prev.includes(payload.playerId) ? prev : [...prev, payload.playerId]
@@ -164,7 +200,8 @@ function HostLiveGame() {
 
           if (!firstQuestionRequestedRef.current) {
             firstQuestionRequestedRef.current = true
-            api.post('/api/games/next', { roomCode: gamePin, questionIndex: 0 })
+            const savedIndex = parseInt(sessionStorage.getItem(`room_${gamePin}_questionIndex`) || '0', 10);
+            api.post('/api/games/next', { roomCode: gamePin, questionIndex: savedIndex })
               .catch((err) => {
                 setQuestionError(err?.response?.data?.message || 'Unable to load the first question.')
                 firstQuestionRequestedRef.current = false
@@ -328,17 +365,26 @@ function HostLiveGame() {
           </div>
 
           {/* Question text + choices — scrollable if too tall on small screens */}
-          <div className="mt-3 flex-1 overflow-y-auto">
-            <h1 className="text-xl font-black leading-tight tracking-tight text-slate-900 sm:text-2xl lg:text-3xl">
-              {questionError
-                ? questionError
-                : currentQuestion
-                ? currentQuestion.questionText
-                : 'Preparing first question…'}
-            </h1>
+          <div className="mt-4 flex flex-1 flex-col overflow-y-auto">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <h1 className="flex-1 text-2xl font-black leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+                {questionError
+                  ? questionError
+                  : currentQuestion
+                  ? currentQuestion.questionText
+                  : 'Preparing first question…'}
+              </h1>
+
+              {/* Countdown timer */}
+              {!questionError && currentQuestion && timeLeft !== null && (
+                <div className={`shrink-0 flex h-16 w-16 items-center justify-center rounded-full text-2xl font-black text-white shadow-lg sm:h-20 sm:w-20 sm:text-3xl ${timerColor}`}>
+                  {timeLeft}
+                </div>
+              )}
+            </div>
 
             {!questionError && currentQuestion && (
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
                 {currentQuestion.choices?.map((choice, i) => (
                   <ChoiceCard key={choice.id ?? i} choice={choice} index={i} />
                 ))}

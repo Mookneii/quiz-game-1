@@ -112,6 +112,9 @@ public class RoomService {
         if (room.getStatus() == RoomStatus.FINISHED) {
             throw new BadRequestException("Room is finished");
         }
+        if (room.getStatus() == RoomStatus.IN_PROGRESS) {
+            throw new BadRequestException("Game has already started");
+        }
         if (roomPlayerRepository.existsByRoomIdAndNicknameIgnoreCase(room.getId(), request.getNickname())) {
             throw new BadRequestException("Nickname already taken");
         }

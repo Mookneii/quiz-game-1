@@ -26,12 +26,12 @@ function WaitingAnswer() {
   const answerResultRef = useRef(httpAnswerResult)
   const [answerResult, setAnswerResult] = useState(httpAnswerResult)
   const [dots, setDots] = useState(1)
-  const [hasSubmitted, setHasSubmitted] = useState(false)
+  const hasSubmittedRef = useRef(false)
 
   // Submit answer if it was not submitted yet (passed from GameRoom)
   useEffect(() => {
-    if (questionId && choiceId !== undefined && timeTakenMs !== undefined && !hasSubmitted) {
-      setHasSubmitted(true)
+    if (questionId && choiceId !== undefined && timeTakenMs !== undefined && !hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
       api.post('/api/games/answer', {
         roomCode: gamePin,
         playerId,
@@ -45,7 +45,7 @@ function WaitingAnswer() {
          }
       }).catch(err => console.error('Answer submit error:', err))
     }
-  }, [questionId, choiceId, timeTakenMs, hasSubmitted, gamePin, playerId])
+  }, [questionId, choiceId, timeTakenMs, gamePin, playerId])
 
   // Animated dots for the waiting text
   useEffect(() => {
@@ -62,7 +62,7 @@ function WaitingAnswer() {
 
     const client = createStompClient()
 
-    client.onConnect = () => {
+    client.onConnect = async () => {
       client.subscribe(`/topic/room/${gamePin}`, (message) => {
         try {
           const event = JSON.parse(message.body)
@@ -93,12 +93,22 @@ function WaitingAnswer() {
           }
 
           if (event.type === 'GAME_FINISHED') {
-            navigate('/leaderboard', { state: { pin: gamePin } })
+            navigate('/leaderboard', { state: { pin: gamePin, playerId: playerId } })
           }
         } catch (_) {
           // Ignore malformed messages
         }
       })
+
+      // Fetch room status to catch if GAME_FINISHED was sent while we were connecting
+      try {
+        const res = await api.get(`/api/rooms/${gamePin}`)
+        if (res.data && res.data.status === 'FINISHED') {
+          navigate('/leaderboard', { state: { pin: gamePin, playerId } })
+        }
+      } catch (err) {
+        console.error("Failed to fetch room status on reconnect", err)
+      }
     }
 
     client.activate()

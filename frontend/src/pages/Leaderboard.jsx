@@ -54,13 +54,14 @@ const LeaderboardPage = () => {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab,     setTab]     = useState('rankings')
+  const [myPlayerId, setMyPlayerId] = useState(locationState.playerId || null)
 
   // Fetch leaderboard results and filter out host entries
   useEffect(() => {
     const fetchResults = async () => {
       try {
         const res = await fetch(
-          `http://${window.location.hostname}:8080/api/games/${roomCode}/results`
+          `http://${window.location.hostname}:8080/api/games/${roomCode}/results?t=${Date.now()}`
         )
         if (!res.ok) return
 
@@ -68,6 +69,22 @@ const LeaderboardPage = () => {
 
         // Log raw response so you can verify field names in the browser console
         console.log('Leaderboard raw API response:', data)
+
+        // Try to identify the current player if we don't have the ID from navigation
+        if (!myPlayerId) {
+          try {
+            const rawUser = localStorage.getItem("user");
+            if (rawUser && rawUser !== "undefined") {
+              const parsedUser = JSON.parse(rawUser);
+              const myResult = data.find(
+                (item) => item.nickname === parsedUser.fullName
+              );
+              if (myResult) setMyPlayerId(myResult.playerId);
+            }
+          } catch (e) {
+            console.error("Failed to parse user for myPlayerId", e);
+          }
+        }
 
         const mapped = data
           // Filter out host entries (no nickname, or explicitly flagged as host)
@@ -190,7 +207,7 @@ const LeaderboardPage = () => {
           )}
 
           {/* ── Review tab ─────────────────────────────────────────────── */}
-          {tab === 'review' && <ReviewSection roomCode={roomCode} />}
+          {tab === 'review' && <ReviewSection roomCode={roomCode} myPlayerId={myPlayerId} />}
         </main>
 
         {/* Back to home */}
@@ -212,37 +229,64 @@ export default LeaderboardPage
 // ─── ReviewSection ────────────────────────────────────────────────────────────
 // Fetches quiz questions and shows each one with the correct answer highlighted.
 
-function ReviewSection({ roomCode }) {
+function ReviewSection({ roomCode, myPlayerId }) {
   const [questions, setQuestions] = useState(null)
+  const [userAnswers, setUserAnswers] = useState({})
 
   useEffect(() => {
     const fetchQuestions = async () => {
       try {
         // 1. Get room → quizId
         const roomRes = await fetch(
-          `http://${window.location.hostname}:8080/api/rooms/${roomCode}`
+          `http://${window.location.hostname}:8080/api/rooms/${roomCode}?t=${Date.now()}`
         )
         if (!roomRes.ok) return
         const { quizId } = await roomRes.json()
         if (!quizId) return
 
-        // 2. Get quiz → questions
-        const quizRes = await fetch(
-          `http://${window.location.hostname}:8080/api/quizzes/${quizId}`
-        )
-        if (!quizRes.ok) return
-        const { questions: qs = [] } = await quizRes.json()
+        // 2. Fetch everything concurrently
+        const fetches = [
+          fetch(`http://${window.location.hostname}:8080/api/questions?t=${Date.now()}`),
+          fetch(`http://${window.location.hostname}:8080/api/choices?t=${Date.now()}`)
+        ]
+        
+        if (myPlayerId) {
+          fetches.push(fetch(`http://${window.location.hostname}:8080/api/answers?t=${Date.now()}`))
+        }
 
-        // 3. Normalize into a simple shape
+        const responses = await Promise.all(fetches)
+        if (!responses[0].ok || !responses[1].ok) return
+
+        const allQuestions = await responses[0].json()
+        const allChoices = await responses[1].json()
+        
+        if (myPlayerId && responses[2] && responses[2].ok) {
+          const allAnswers = await responses[2].json()
+          const myAnswers = allAnswers.filter((a) => String(a.playerId) === String(myPlayerId))
+          const ansMap = {}
+          for (const a of myAnswers) {
+            ansMap[a.questionId] = a.choiceId
+          }
+          setUserAnswers(ansMap)
+        }
+
+        // Filter for this quiz
+        const myQs = allQuestions.filter(q => q.quizId === quizId)
+
+        // 3. Normalize into a simple shape and set state
         setQuestions(
-          qs.map((q, idx) => ({
-            id:      q.id ?? idx,
-            text:    q.questionText,
-            choices: (q.choices || []).map((c) => ({
-              text:      c.choiceText,
-              isCorrect: !!c.isCorrect,
-            })),
-          }))
+          myQs.map((q) => {
+            const myChoices = allChoices.filter(c => c.questionId === q.id)
+            return {
+              id:      q.id,
+              text:    q.questionText,
+              choices: myChoices.map((c) => ({
+                id:        c.id,
+                text:      c.choiceText,
+                isCorrect: !!c.correct,
+              })),
+            }
+          })
         )
       } catch (err) {
         console.error('Review fetch error:', err)
@@ -250,7 +294,7 @@ function ReviewSection({ roomCode }) {
     }
 
     fetchQuestions()
-  }, [roomCode])
+  }, [roomCode, myPlayerId])
 
   if (!questions) {
     return <p className="mt-6 text-center text-sm text-slate-400">Loading review…</p>
@@ -272,21 +316,42 @@ function ReviewSection({ roomCode }) {
 
           {/* Choices */}
           <ul className="space-y-2">
-            {q.choices.map((c, i) => (
-              <li
-                key={i}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${
-                  c.isCorrect
-                    ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-                    : 'border border-transparent bg-white text-slate-700'
-                }`}
-              >
-                <span>{c.text}</span>
-                {c.isCorrect && (
-                  <span className="ml-2 shrink-0 text-xs font-bold text-emerald-600">✓ Correct</span>
-                )}
-              </li>
-            ))}
+            {q.choices.map((c, i) => {
+              let bgClass = 'border border-transparent bg-white text-slate-700';
+              const isCorrectAnswer = c.isCorrect;
+              const isUserAnswer = String(c.id) === String(userAnswers[q.id]);
+
+              if (isCorrectAnswer && isUserAnswer) {
+                bgClass = 'border border-emerald-200 bg-emerald-50 text-emerald-800';
+              } else if (isCorrectAnswer) {
+                bgClass = 'border border-blue-200 bg-blue-50 text-blue-800';
+              } else if (isUserAnswer) {
+                bgClass = 'border border-red-200 bg-red-50 text-red-800';
+              }
+
+              return (
+                <li
+                  key={i}
+                  className={`flex flex-col gap-2 rounded-xl px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between ${bgClass}`}
+                >
+                  <span>{c.text}</span>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {isCorrectAnswer && isUserAnswer && (
+                      <>
+                        <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">✓ Correct</span>
+                        <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-700">Your Answer</span>
+                      </>
+                    )}
+                    {isCorrectAnswer && !isUserAnswer && (
+                      <span className="rounded bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">✓ Correct Answer</span>
+                    )}
+                    {isUserAnswer && !isCorrectAnswer && (
+                      <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-700">✗ Your Answer</span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}

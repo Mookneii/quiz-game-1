@@ -217,7 +217,7 @@ const AnswerRes = () => {
 					else if (event.type === 'GAME_FINISHED') {
 
 						navigate('/leaderboard', {
-							state: { pin: gamePin }
+							state: { pin: gamePin, playerId: playerId }
 						});
 					}
 
@@ -225,6 +225,18 @@ const AnswerRes = () => {
 					console.error(error);
 				}
 			});
+
+			// Fetch room status to catch if GAME_FINISHED was sent while we were connecting
+			try {
+				fetch(`http://${window.location.hostname}:8080/api/rooms/${gamePin}`)
+					.then(res => res.json())
+					.then(data => {
+						if (data && data.status === 'FINISHED') {
+							navigate('/leaderboard', { state: { pin: gamePin, playerId } });
+						}
+					})
+					.catch(err => console.error("Failed to fetch room status on reconnect", err));
+			} catch (e) {}
 		};
 
 		// Start WebSocket connection

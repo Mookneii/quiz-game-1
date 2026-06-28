@@ -69,6 +69,26 @@ public class GameService {
         if (room.getStatus() == RoomStatus.IN_PROGRESS) {
             throw new BadRequestException("Game already started");
         }
+        
+        // Clear any old game results for this room so it doesn't return stale data
+        List<GameResult> oldResults = gameResultRepository.findByRoomId(room.getId());
+        if (!oldResults.isEmpty()) {
+            gameResultRepository.deleteAll(oldResults);
+        }
+
+        // Clear any old answers for this room so correctCount doesn't accumulate
+        List<Answer> oldAnswers = answerRepository.findByRoomId(room.getId());
+        if (!oldAnswers.isEmpty()) {
+            answerRepository.deleteAll(oldAnswers);
+        }
+
+        // Reset all players' scores
+        List<RoomPlayer> players = roomPlayerRepository.findByRoomIdOrderByJoinedAtAsc(room.getId());
+        for (RoomPlayer player : players) {
+            player.setScore(0);
+        }
+        roomPlayerRepository.saveAll(players);
+
         room.setStatus(RoomStatus.IN_PROGRESS);
         room.setStartedAt(LocalDateTime.now());
         roomRepository.save(room);
@@ -261,17 +281,19 @@ public class GameService {
     }
 
     private List<GameResultDTO> buildResults(Room room) {
-        List<GameResult> existing = gameResultRepository.findByRoomId(room.getId());
-        if (!existing.isEmpty()) {
-            return existing.stream()
-                    .filter(result -> !Boolean.TRUE.equals(result.getPlayer().getHost()))
-                    .map(result -> new GameResultDTO(
-                            result.getPlayer().getId(),
-                            result.getPlayer().getNickname(),
-                            result.getTotalScore(),
-                            result.getCorrectCount()
-                    ))
-                    .collect(Collectors.toList());
+        if (room.getStatus() == RoomStatus.FINISHED) {
+            List<GameResult> existing = gameResultRepository.findByRoomId(room.getId());
+            if (!existing.isEmpty()) {
+                return existing.stream()
+                        .filter(result -> !Boolean.TRUE.equals(result.getPlayer().getHost()))
+                        .map(result -> new GameResultDTO(
+                                result.getPlayer().getId(),
+                                result.getPlayer().getNickname(),
+                                result.getTotalScore(),
+                                result.getCorrectCount()
+                        ))
+                        .collect(Collectors.toList());
+            }
         }
 
         List<RoomPlayer> players = roomPlayerRepository.findByRoomIdOrderByJoinedAtAsc(room.getId());
@@ -286,12 +308,14 @@ public class GameService {
             int totalScore = safeScore(player);
             int correctCount = (int) answerRepository.countByRoomIdAndPlayerIdAndCorrectTrue(room.getId(), player.getId());
 
-            GameResult gameResult = new GameResult();
-            gameResult.setRoom(room);
-            gameResult.setPlayer(player);
-            gameResult.setTotalScore(totalScore);
-            gameResult.setCorrectCount(correctCount);
-            gameResultRepository.save(gameResult);
+            if (room.getStatus() == RoomStatus.FINISHED) {
+                GameResult gameResult = new GameResult();
+                gameResult.setRoom(room);
+                gameResult.setPlayer(player);
+                gameResult.setTotalScore(totalScore);
+                gameResult.setCorrectCount(correctCount);
+                gameResultRepository.save(gameResult);
+            }
 
             results.add(new GameResultDTO(
                     player.getId(),

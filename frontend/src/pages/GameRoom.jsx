@@ -75,6 +75,9 @@ function GameRoom() {
 
   // Used to calculate response time (ms)
   const startTimeRef = useRef(Date.now())
+  const endTimeRef = useRef(
+    locationState.question?.timeLimit ? Date.now() + locationState.question.timeLimit * 1000 : 0
+  )
 
   // ─────────────────────────────────────────────────────────────
   // ANSWER STATE
@@ -122,19 +125,35 @@ function GameRoom() {
 
             // Reset timer reference
             startTimeRef.current = Date.now()
+            endTimeRef.current = Date.now() + (newQ?.timeLimit || 0) * 1000
           }
 
           // ─────────────────────────────────────────────
           // GAME FINISHED
           // ─────────────────────────────────────────────
-          if (event.type === 'GAME_FINISHED') {
-            navigate('/leaderboard', { state: { pin: gamePin } })
-          }
+          else if (event.type === 'GAME_FINISHED') {
+            if (stompClientRef.current) {
+              stompClientRef.current.deactivate()
+            }
+            navigate('/leaderboard', { state: { pin: gamePin, playerId: playerId } })
+          } 
 
         } catch (err) {
           console.error('GameRoom WS error:', err)
         }
       })
+
+      // Fetch room status to catch if GAME_FINISHED was sent while we were connecting
+      try {
+        fetch(`http://${window.location.hostname}:8080/api/rooms/${gamePin}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.status === 'FINISHED') {
+              navigate('/leaderboard', { state: { pin: gamePin, playerId } })
+            }
+          })
+          .catch(err => console.error("Failed to fetch room status on reconnect", err))
+      } catch (e) {}
     }
 
     client.activate()
@@ -160,9 +179,12 @@ function GameRoom() {
       return
     }
 
-    // Countdown every 1 second
+    // Countdown based on real-time clock to avoid drift
     const id = setInterval(() => {
-      setTimeLeft(prev => prev - 1)
+      setTimeLeft(() => {
+        const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000))
+        return remaining
+      })
     }, 1000)
 
     return () => clearInterval(id)
