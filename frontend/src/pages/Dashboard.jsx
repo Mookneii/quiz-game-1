@@ -286,6 +286,9 @@ export default function HostDashboard() {
                     <span>📄 {quiz.questionsCount || 0} Questions</span>
                     <span>🏷 {quiz.category || "General"}</span>
                     <span>⏱ {quiz.updatedAt || "Recently"}</span>
+                    {quiz.description && (
+                      <span className="break-words mt-2 text-zinc-400 italic">"{quiz.description}"</span>
+                    )}
                   </div>
 
                   {/* BUTTONS */}
