@@ -329,21 +329,6 @@ export default function HostDashboard() {
               </button>
             </div>
 
-            {/* EMPTY */}
-            {filteredQuizzes.length === 0 && (
-              <div className="text-center py-20">
-                <h2 className="text-2xl sm:text-3xl font-bold text-gray-700 mb-4">
-                  No quizzes found
-                </h2>
-
-                <button
-                  onClick={() => navigate("/create-quiz")}
-                  className="bg-emerald-500 text-white px-6 py-3 rounded-xl text-sm font-semibold"
-                >
-                  Create Quiz
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>
