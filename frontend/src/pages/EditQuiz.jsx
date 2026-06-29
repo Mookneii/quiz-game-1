@@ -248,10 +248,10 @@ export default function EditQuiz() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100 flex relative overflow-x-hidden">
+    <div className="h-screen bg-zinc-100 flex relative overflow-hidden">
       <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto">
         {/* NAVBAR */}
         <div className="h-14 sm:h-16 bg-white border-b flex items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">

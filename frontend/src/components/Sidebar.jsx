@@ -30,7 +30,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }) {
           bg-[#eef2f7] border-r w-[260px]
           transition-transform duration-300 ease-in-out
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:static lg:translate-x-0 lg:flex lg:min-h-screen
+          lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:flex
         `}
       >
         <div>
