@@ -37,8 +37,8 @@ export default function Contact() {
           </div>
 
           {/* Background blur */}
-          <div className="absolute top-0 right-0 w-52 h-52 bg-green-200 rounded-full blur-3xl opacity-30"></div>
-          <div className="absolute bottom-0 left-0 w-52 h-52 bg-blue-200 rounded-full blur-3xl opacity-20"></div>
+          <div className="absolute top-0 right-0 w-52 h-52 bg-green-200 rounded-full blur-3xl opacity-30 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-52 h-52 bg-blue-200 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
         </section>
 
         {/* CONTACT SECTION */}

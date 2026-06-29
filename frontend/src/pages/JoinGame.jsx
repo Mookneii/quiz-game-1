@@ -66,9 +66,9 @@ export default function JoinGame() {
     <>
       <div className="min-h-screen bg-linear-to-r from-blue-500 to-green-400 flex items-center justify-center px-6 py-16 overflow-hidden relative">
         {/* Glow Effects */}
-        <div className="absolute top-32 right-40 w-32 h-32 bg-yellow-300 opacity-20 blur-3xl rounded-full"></div>
-        <div className="absolute bottom-32 right-20 w-40 h-40 bg-white opacity-20 blur-3xl rounded-full"></div>
-        <div className="absolute top-1/2 right-1/3 w-20 h-20 bg-yellow-200 opacity-30 blur-2xl rounded-full"></div>
+        <div className="absolute top-32 right-40 w-32 h-32 bg-yellow-300 opacity-20 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-32 right-20 w-40 h-40 bg-white opacity-20 blur-3xl rounded-full pointer-events-none"></div>
+        <div className="absolute top-1/2 right-1/3 w-20 h-20 bg-yellow-200 opacity-30 blur-2xl rounded-full pointer-events-none"></div>
 
         <div className="max-w-6xl w-full grid md:grid-cols-2 gap-20 items-center">
           {/* LEFT CARD */}
@@ -155,7 +155,7 @@ export default function JoinGame() {
 
           {/* RIGHT ILLUSTRATION */}
           <div className="hidden md:flex justify-center relative">
-            <div className="w-96 h-96 rounded-full bg-linear-to-r from-pink-400 to-yellow-400 opacity-30 blur-3xl absolute -top-10 -right-10"></div>
+            <div className="w-96 h-96 rounded-full bg-linear-to-r from-pink-400 to-yellow-400 opacity-30 blur-3xl absolute -top-10 -right-10 pointer-events-none"></div>
             {/* Phone */}
             <div className="relative mt-28">
               <div className="w-56 h-110 rounded-[45px] border-4 border-white/40 bg-white/20 backdrop-blur-md shadow-2xl flex flex-col items-center py-8">

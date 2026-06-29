@@ -75,8 +75,8 @@ export default function AboutPage() {
         </div>
 
         {/* Background circles */}
-        <div className="absolute top-10 right-10 w-40 h-40 bg-purple-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-52 h-52 bg-green-200 rounded-full opacity-30 blur-3xl"></div>
+        <div className="absolute top-10 right-10 w-40 h-40 bg-purple-200 rounded-full opacity-30 blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-52 h-52 bg-green-200 rounded-full opacity-30 blur-3xl pointer-events-none"></div>
       </section>
 
       {/* STORY SECTION */}
